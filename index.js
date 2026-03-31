@@ -8,12 +8,14 @@ const app = express();
 const server = http.createServer(app);
 const wss = new WebSocket.Server({ server });
 
+require('dotenv').config();
+
 app.use(cors());
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
 app.use(express.static(path.join(__dirname, 'public')));
 
-const API_TOKEN = "q83kF9s269Z1lYwQvP4g8cJzR7mHnT5uD2aB6L0Xc9eVwYp3tS1k==";
+const API_TOKEN = process.env.AUTH_KEY;
 const PORT = 3000;
 
 let logs = [];
