@@ -1,0 +1,391 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Webhook Inspector</title>
+
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+
+    <style>
+        :root {
+            --bg: #020617;
+            --panel: #0f172a;
+            --border: #1e293b;
+            --cyan: #22d3ee;
+            --green: #22c55e;
+            --red: #ef4444;
+            --text: #e2e8f0;
+            --muted: #94a3b8;
+        }
+
+        body {
+            margin: 0;
+            font-family: 'Inter', sans-serif;
+            background: radial-gradient(circle at top, #020617, #000);
+            color: var(--text);
+        }
+
+        .header {
+            display: flex;
+            justify-content: space-between;
+            padding: 16px 20px;
+            border-bottom: 1px solid var(--border);
+            background: rgba(2, 6, 23, 0.8);
+            backdrop-filter: blur(8px);
+        }
+
+        .title {
+            color: var(--cyan);
+            font-weight: 600;
+        }
+
+        .actions {
+            display: flex;
+            gap: 12px;
+            align-items: center;
+        }
+
+        .count {
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--cyan);
+            text-shadow: 0 0 8px rgba(34, 211, 238, 0.6);
+        }
+
+        button {
+            background: var(--cyan);
+            border: none;
+            padding: 6px 12px;
+            border-radius: 6px;
+            color: black;
+            font-weight: 500;
+            cursor: pointer;
+        }
+
+        #logs {
+            padding: 16px;
+            max-width: 1100px;
+            margin: auto;
+        }
+
+        .log {
+            border-radius: 12px;
+            margin-bottom: 14px;
+            overflow: hidden;
+            border: 1px solid var(--border);
+            background: linear-gradient(145deg, #0f172a, #020617);
+            position: relative;
+        }
+
+        .log::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            border-radius: 12px;
+            pointer-events: none;
+            opacity: 0.25;
+        }
+
+        .log.get::before {
+            box-shadow: 0 0 20px rgba(34, 197, 94, 0.25);
+        }
+
+        .log.post::before {
+            box-shadow: 0 0 20px rgba(59, 130, 246, 0.25);
+        }
+
+        .log.get {
+            border-left: 4px solid #22c55e;
+        }
+
+        .log.post {
+            border-left: 4px solid #3b82f6;
+        }
+
+        .log.error {
+            box-shadow: 0 0 10px rgba(239, 68, 68, 0.4);
+        }
+
+        .log-header {
+            padding: 14px;
+            display: flex;
+            justify-content: space-between;
+            cursor: pointer;
+        }
+
+        .left {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+
+        .arrow {
+            font-size: 13px;
+            color: var(--muted);
+        }
+
+        .right {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+        }
+
+
+        .method {
+            font-size: 11px;
+            padding: 3px 8px;
+            border-radius: 6px;
+            font-weight: 600;
+        }
+
+        .method.GET {
+            background: rgba(34, 197, 94, 0.15);
+            color: #22c55e;
+        }
+
+        .method.POST {
+            background: rgba(59, 130, 246, 0.15);
+            color: #3b82f6;
+        }
+
+
+        .url {
+            font-size: 13px;
+        }
+
+        .status {
+            font-weight: 700;
+            margin-left: 6px;
+        }
+
+        .status.success {
+            color: #22c55e;
+        }
+
+        .status.error {
+            color: #ef4444;
+        }
+
+
+        .indicators span {
+            font-size: 11px;
+            margin-left: 6px;
+        }
+
+        .log-body {
+            display: none;
+            border-top: 1px solid var(--border);
+        }
+
+        .section {
+            border-top: 1px solid var(--border);
+        }
+
+        .section-header {
+            padding: 10px 14px;
+            cursor: pointer;
+            color: var(--cyan);
+        }
+
+        .section-body {
+            padding: 10px 14px;
+        }
+
+        pre {
+            margin: 0;
+            font-size: 12px;
+            overflow-x: auto;
+        }
+
+        .delete {
+            cursor: pointer;
+            font-size: 16px;
+            color: #ef4444;
+            padding: 6px;
+            border-radius: 6px;
+            background: rgba(239, 68, 68, 0.1);
+            transition: 0.2s;
+        }
+
+        .delete:hover {
+            background: rgba(239, 68, 68, 0.2);
+            transform: scale(1.15);
+            box-shadow: 0 0 8px rgba(239, 68, 68, 0.6);
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="header">
+        <div class="title">⚡ WEBHOOK INSPECTOR</div>
+        <div class="actions">
+            <div class="count" id="count">0 logs</div>
+            <button onclick="clearLogs()">Clear</button>
+        </div>
+    </div>
+
+    <div id="logs"></div>
+
+    <script>
+        let logs = [];
+        const logsDiv = document.getElementById('logs');
+        const countEl = document.getElementById('count');
+
+        /* Toggle */
+        function toggle(el) {
+            const body = el.nextElementSibling;
+            const arrow = el.querySelector('.arrow');
+
+            const open = body.style.display === 'block';
+            body.style.display = open ? 'none' : 'block';
+            arrow.innerText = open ? '▸' : '▾';
+        }
+
+        function toggleSection(el) {
+            const body = el.nextElementSibling;
+            body.style.display = body.style.display === 'none' ? 'block' : 'none';
+        }
+
+        /* Safe parse */
+        function safeParse(data) {
+            try {
+                if (typeof data === 'string') return JSON.parse(data);
+                return data;
+            } catch {
+                return data;
+            }
+        }
+
+        /* Indicator */
+        function indicator(obj) {
+            return Object.keys(obj || {}).length === 0 ? '⚪' : '🟢';
+        }
+
+        function renderLog(log, index) {
+            const el = document.createElement('div');
+
+            const isError = log.status >= 400;
+            const methodClass = log.method.toLowerCase();
+
+            el.className = `log ${methodClass}`;
+
+            const response = safeParse(log.response);
+
+            el.innerHTML = `
+    <div class="log-header" onclick="toggle(this)">
+      <div class="left">
+        <div class="arrow">⯈</div>
+        <div class="method ${log.method}">${log.method}</div>
+        <div class="url">${log.url}</div>
+        <div class="status ${isError ? 'error' : 'success'}">
+          ${log.status}
+        </div>
+      </div>
+
+      <div class="right">
+        <div>${new Date(log.time).toLocaleTimeString()}</div>
+        <div class="delete" onclick="deleteLog(event, ${log.id})">🗑</div>
+      </div>
+    </div>
+
+    <div class="log-body">
+      ${section('Headers', log.headers)}
+      ${section('Query', log.query)}
+      ${section('Body', log.body)}
+      ${section('Response', response)}
+    </div>
+  `;
+
+            return el;
+        }
+
+        /* Toggle */
+        function toggle(el) {
+            const body = el.nextElementSibling;
+            const arrow = el.querySelector('.arrow');
+
+            const open = body.style.display === 'block';
+            body.style.display = open ? 'none' : 'block';
+            arrow.innerText = open ? '⯈' : '⯆';
+        }
+
+        /* Section toggle */
+        function toggleSection(el) {
+            const body = el.nextElementSibling;
+            body.style.display = body.style.display === 'none' ? 'block' : 'none';
+
+            el.innerText = el.innerText.startsWith('⯈')
+                ? el.innerText.replace('⯈', '⯆')
+                : el.innerText.replace('⯆', '⯈');
+        }
+
+        /* Section */
+        function section(title, data) {
+            return `
+    <div class="section">
+      <div class="section-header" onclick="toggleSection(this)">▸ ${title}</div>
+      <div class="section-body">
+        <pre>${JSON.stringify(data, null, 2)}</pre>
+      </div>
+    </div>
+  `;
+        }
+
+        /* Refresh */
+        function refresh() {
+            logsDiv.innerHTML = '';
+            logs.forEach((l, i) => logsDiv.appendChild(renderLog(l, i)));
+            countEl.innerText = logs.length + ' logs';
+        }
+
+        /* Delete */
+        function deleteLog(e, id) {
+            e.stopPropagation();
+
+            fetch(`/logs/${id}`, { method: 'DELETE' });
+        }
+
+        /* Clear */
+        function clearLogs() {
+            fetch('/logs', { method: 'DELETE' });
+            logs = [];
+            refresh();
+        }
+
+        /* Init */
+        fetch('/logs')
+            .then(r => r.json())
+            .then(data => {
+                logs = data.reverse(); // latest on top
+                refresh();
+            });
+
+        /* WS */
+        const protocol = location.protocol === 'https:' ? 'wss' : 'ws';
+        const ws = new WebSocket(`${protocol}://${location.host}`);
+
+        ws.onmessage = (e) => {
+            const msg = JSON.parse(e.data);
+
+            if (msg.type === 'NEW_LOG') {
+                logs.unshift(msg.data);
+                refresh();
+            }
+
+            if (msg.type === 'CLEAR_LOGS') {
+                logs = [];
+                refresh();
+            }
+
+            if (msg.type === 'DELETE_LOG') {
+                logs = logs.filter(l => l.id !== msg.id);
+                refresh();
+            }
+        };
+    </script>
+
+</body>
+
+</html>
