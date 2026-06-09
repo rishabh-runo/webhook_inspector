@@ -18,59 +18,53 @@ app.use(express.static(path.join(__dirname, 'public')));
 const API_TOKEN = process.env.AUTH_KEY;
 const PORT = 3000;
 
-let logs = [];
+const channels = {
+  open: [],
+  secure: []
+};
 
 function broadcast(data) {
   const msg = JSON.stringify(data);
   wss.clients.forEach(client => {
-    if (client.readyState === WebSocket.OPEN) {
-      client.send(msg);
-    }
+    if (client.readyState === WebSocket.OPEN) client.send(msg);
   });
 }
 
-function addLog(log) {
-  logs.unshift(log);
-  broadcast({ type: 'NEW_LOG', data: log });
-}
+function makeLogger(channel) {
+  return (req, res, next) => {
+    const start = Date.now();
+    const originalSend = res.send;
+    let responseBody;
 
-// ----------- LOG ONLY /webhook -----------
-app.use((req, res, next) => {
-  if (!req.originalUrl.startsWith('/webhook')) return next();
-
-  const start = Date.now();
-  const originalSend = res.send;
-
-  let responseBody;
-
-  res.send = function (body) {
-    responseBody = body;
-    return originalSend.call(this, body);
-  };
-
-  res.on('finish', () => {
-    if (req.method !== 'GET' && req.method !== 'POST') return;
-
-    const log = {
-      id: Date.now(),
-      method: req.method,
-      url: req.originalUrl,
-      headers: req.headers,
-      query: req.query,
-      body: req.body,
-      response: responseBody,
-      status: res.statusCode,
-      time: new Date().toISOString(),
-      duration: Date.now() - start
+    res.send = function (body) {
+      responseBody = body;
+      return originalSend.call(this, body);
     };
 
-    addLog(log);
-  });
+    res.on('finish', () => {
+      if (req.method !== 'GET' && req.method !== 'POST') return;
 
-  next();
-});
+      const log = {
+        id: Date.now(),
+        method: req.method,
+        url: req.originalUrl,
+        headers: req.headers,
+        query: req.query,
+        body: req.body,
+        response: responseBody,
+        status: res.statusCode,
+        time: new Date().toISOString(),
+        duration: Date.now() - start
+      };
 
-// ----------- AUTH -----------
+      channels[channel].unshift(log);
+      broadcast({ type: 'NEW_LOG', channel, data: log });
+    });
+
+    next();
+  };
+}
+
 function authMiddleware(req, res, next) {
   const token = req.headers['auth-key'];
   if (!token || token !== API_TOKEN) {
@@ -79,29 +73,38 @@ function authMiddleware(req, res, next) {
   next();
 }
 
-// ----------- WEBHOOK -----------
-app.all('/webhook', authMiddleware, (req, res) => {
+// ----------- WEBHOOKS -----------
+app.all('/hook/open', makeLogger('open'), (req, res) => {
   res.json({ status: 'OK' });
 });
 
-// ----------- CLEAR LOGS -----------
-app.delete('/logs', (req, res) => {
-  logs = [];
-  broadcast({ type: 'CLEAR_LOGS' });
+app.all('/hook/secure', makeLogger('secure'), authMiddleware, (req, res) => {
+  res.json({ status: 'OK' });
+});
+
+// ----------- LOGS API -----------
+app.get('/logs/:channel', (req, res) => {
+  const ch = req.params.channel;
+  if (!channels[ch]) return res.status(404).json({ message: 'Unknown channel' });
+  res.json(channels[ch]);
+});
+
+app.delete('/logs/:channel', (req, res) => {
+  const ch = req.params.channel;
+  if (!channels[ch]) return res.status(404).json({ message: 'Unknown channel' });
+  channels[ch] = [];
+  broadcast({ type: 'CLEAR_LOGS', channel: ch });
   res.json({ status: 'cleared' });
 });
 
-app.delete('/logs/:id', (req, res) => {
+app.delete('/logs/:channel/:id', (req, res) => {
+  const ch = req.params.channel;
   const id = parseInt(req.params.id);
-
-  logs = logs.filter(log => log.id !== id);
-
-  broadcast({ type: 'DELETE_LOG', id });
-
+  if (!channels[ch]) return res.status(404).json({ message: 'Unknown channel' });
+  channels[ch] = channels[ch].filter(log => log.id !== id);
+  broadcast({ type: 'DELETE_LOG', channel: ch, id });
   res.json({ status: 'deleted' });
 });
-
-app.get('/logs', (req, res) => res.json(logs));
 
 server.listen(PORT, () => {
   console.log(`Server running on http://localhost:${PORT}`);
