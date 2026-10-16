@@ -1,4 +1,4 @@
-import { esc, cleanMethod, relTime, formatBytes, tryParse, bodyText } from './utils.js';
+import { esc, cleanMethod, relTime, formatBytes, tryParse, bodyText, icon } from './utils.js';
 import { jsonTree } from './json-view.js';
 
 export const SECTIONS = [
@@ -23,28 +23,28 @@ export function renderCard(log, view) {
     el.dataset.id = log.id;
 
     const sig = log.signature
-        ? `<span class="sig ${log.signature.valid ? 'ok' : 'bad'}" title="${esc(log.signature.reason)}">${log.signature.valid ? '✓ signed' : '✗ signature'}</span>`
+        ? `<span class="sig ${log.signature.valid ? 'ok' : 'bad'}" title="${esc(log.signature.reason)}">${icon(log.signature.valid ? 'shield-check' : 'shield-x')}${log.signature.valid ? 'Signed' : 'Bad signature'}</span>`
         : '';
     const time = new Date(log.time);
 
     el.innerHTML = `
     <div class="log-header" data-action="toggle">
       <div class="left">
-        <span class="arrow">${view.expanded ? '⯆' : '⯈'}</span>
+        ${icon('chevron-right', 'arrow')}
         <span class="method">${esc(method)}</span>
         <span class="url" title="${esc(log.url)}">${esc(log.url)}</span>
         <span class="status ${isError ? 'error' : 'success'}">${status}</span>
         ${sig}
-        ${log.aborted ? '<span class="chip warn">aborted</span>' : ''}
+        ${log.aborted ? `<span class="chip warn">${icon('alert')}aborted</span>` : ''}
         ${log.imported ? '<span class="chip">imported</span>' : ''}
       </div>
       <div class="right">
         <span class="meta">${formatBytes(log.size)} · ${Number(log.duration) || 0} ms${log.ip ? ` · ${esc(log.ip)}` : ''}</span>
         <span class="rel-time" data-time="${esc(log.time)}" title="${esc(time.toLocaleString())}">${esc(relTime(log.time))}</span>
-        <label class="cmp" title="Select for compare (x)"><input type="checkbox" data-action="compare"${view.compared ? ' checked' : ''}></label>
-        <button class="icon-btn" data-action="curl" title="Copy as cURL (c)">⧉</button>
-        <button class="icon-btn star${log.pinned ? ' on' : ''}" data-action="pin" title="${log.pinned ? 'Unstar' : 'Star'} (s)">${log.pinned ? '★' : '☆'}</button>
-        <button class="icon-btn delete" data-action="delete" title="Delete">🗑</button>
+        <label class="cmp" title="Select for compare (x)"><input type="checkbox" data-action="compare" aria-label="Select for compare"${view.compared ? ' checked' : ''}></label>
+        <button class="icon-btn" data-action="curl" title="Copy as cURL (c)" aria-label="Copy as cURL">${icon('terminal')}</button>
+        <button class="icon-btn star${log.pinned ? ' on' : ''}" data-action="pin" title="${log.pinned ? 'Unstar' : 'Star'} (s)" aria-label="Star" aria-pressed="${!!log.pinned}">${icon('star')}</button>
+        <button class="icon-btn delete" data-action="delete" title="Delete" aria-label="Delete log">${icon('trash')}</button>
       </div>
     </div>
     <div class="log-body">${view.expanded ? sectionsHtml(log, view.sections) : ''}</div>`;
@@ -58,10 +58,10 @@ export function sectionsHtml(log, openSections) {
         return `
       <div class="section${open ? ' open' : ''}" data-section="${key}">
         <div class="section-header" data-action="section">
-          <span class="section-title">${open ? '⯆' : '⯈'} ${title}</span>
+          <span class="section-title">${icon('chevron-right', 'chev')}${title}</span>
           <span class="meta">${esc(sectionMeta(key, log))}</span>
           <span class="spacer"></span>
-          <button class="icon-btn sm" data-action="copy-section" title="Copy">⧉ Copy</button>
+          <button class="btn ghost xs" data-action="copy-section" aria-label="Copy ${title}">${icon('copy')}Copy</button>
         </div>
         <div class="section-body">${open ? sectionContent(key, log) : ''}</div>
       </div>`;
@@ -118,12 +118,13 @@ export function sectionCopyText(key, log) {
 
 export function renderEmpty(channel, origin, filtered) {
     if (filtered) {
-        return `<div class="empty">No logs match the current filters.</div>`;
+        return `<div class="empty">${icon('search', 'empty-icon')}<p>No logs match the current filters.</p></div>`;
     }
     const url = channel ? `${origin}/hook/${channel.id}` : '';
     return `
     <div class="empty">
-      No requests captured yet.<br>
+      ${icon('inbox', 'empty-icon')}
+      <p>No requests captured yet. Send one to:</p>
       <code class="endpoint">${esc(url)}</code>
     </div>`;
 }
