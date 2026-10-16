@@ -42,13 +42,17 @@ Create a `.env` file in the project root:
 
 ```env
 AUTH_KEY=your_secret_key_here
+VIEWER_KEY=your_viewer_key_here
 ```
 
-| Variable | Used As | Default in `.env` |
+| Variable | Used As | Default |
 |---|---|---|
-| `AUTH_KEY` | `Authorization` token for `/webhook` endpoint | `test` |
+| `AUTH_KEY` | `auth-key` header required by `/hook/secure` (unset = all rejected) | none |
+| `VIEWER_KEY` | Optional. Protects `/logs/*` (`viewer-key` header) and the WebSocket (`?key=`). The dashboard prompts for it. | none (open) |
+| `PORT` | HTTP/WS port | `3000` |
+| `MAX_LOGS` | Max logs kept per channel (oldest dropped) | `500` |
 
-Loaded at startup via `require('dotenv').config()` and read as `process.env.AUTH_KEY`.
+Loaded at startup via `require('dotenv').config()`. Sensitive headers (`auth-key`, `viewer-key`, `authorization`, `cookie`) are masked as `***` in logs.
 
 ---
 
@@ -56,10 +60,10 @@ Loaded at startup via `require('dotenv').config()` and read as `process.env.AUTH
 
 ```bash
 npm install
-node index.js
+npm start
 ```
 
-Server starts on **http://localhost:3000**.
+Server starts on **http://localhost:3000** (or `PORT`).
 
 ---
 
@@ -330,10 +334,8 @@ Vonage (formerly Nexmo) sends webhook callbacks to a configured URL when telepho
 
 | Limitation | Detail |
 |---|---|
-| No persistence | All logs live in `let logs = []`; wiped on restart |
+| No persistence | Logs live in memory; wiped on restart |
 | Single process | No support for multiple server instances sharing logs |
-| No log cap | Memory grows unbounded; clear logs manually |
-| Only GET/POST logged | Other HTTP methods hit the endpoint but are not stored |
 | No HTTPS | Dashboard and WebSocket run plain HTTP/WS unless wrapped |
 | No rate limiting | No throttle on the `/webhook` endpoint |
 

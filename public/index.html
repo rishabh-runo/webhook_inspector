@@ -199,6 +199,12 @@
             padding: 3px 8px;
             border-radius: 6px;
             font-weight: 600;
+            background: rgba(148, 163, 184, 0.15);
+            color: var(--muted);
+        }
+
+        .log {
+            border-left: 4px solid var(--muted);
         }
 
         .method.GET {
@@ -358,32 +364,43 @@
             }
         }
 
+        function esc(value) {
+            return String(value ?? '')
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#39;');
+        }
+
         function section(title, data) {
             return `
     <div class="section">
       <div class="section-header" onclick="toggleSection(this)">⯈ ${title}</div>
       <div class="section-body" style="display:none">
-        <pre>${JSON.stringify(data, null, 2)}</pre>
+        <pre>${esc(JSON.stringify(data, null, 2))}</pre>
       </div>
     </div>`;
         }
 
         function renderLog(log) {
             const el = document.createElement('div');
-            const isError = log.status >= 400;
-            el.className = `log ${log.method.toLowerCase()}${isError ? ' error' : ''}`;
+            const status = Number(log.status);
+            const isError = status >= 400;
+            const method = String(log.method).replace(/[^A-Za-z]/g, '');
+            el.className = `log ${method.toLowerCase()}${isError ? ' error' : ''}`;
 
             el.innerHTML = `
     <div class="log-header" onclick="toggle(this)">
       <div class="left">
         <div class="arrow">⯈</div>
-        <div class="method ${log.method}">${log.method}</div>
-        <div class="url">${log.url}</div>
-        <div class="status ${isError ? 'error' : 'success'}">${log.status}</div>
+        <div class="method ${method}">${method}</div>
+        <div class="url">${esc(log.url)}</div>
+        <div class="status ${isError ? 'error' : 'success'}">${status}</div>
       </div>
       <div class="right">
-        <div>${new Date(log.time).toLocaleTimeString()}</div>
-        <div class="delete" onclick="deleteLog(event, ${log.id})">🗑</div>
+        <div>${esc(new Date(log.time).toLocaleTimeString())}</div>
+        <div class="delete" onclick="deleteLog(event, ${Number(log.id)})">🗑</div>
       </div>
     </div>
     <div class="log-body">
@@ -415,30 +432,59 @@
             updateTabCounts();
         }
 
+        /* Viewer key (only needed when the server sets VIEWER_KEY) */
+        function getViewerKey() {
+            try { return localStorage.getItem('viewerKey') || ''; } catch { return ''; }
+        }
+
+        function askViewerKey() {
+            const key = prompt('Viewer key required');
+            if (key === null) return;
+            try { localStorage.setItem('viewerKey', key); } catch { }
+            location.reload();
+        }
+
+        function api(url, options = {}) {
+            return fetch(url, {
+                ...options,
+                headers: { ...(options.headers || {}), 'viewer-key': getViewerKey() }
+            }).then(r => {
+                if (r.status === 401) {
+                    askViewerKey();
+                    throw new Error('Unauthorized');
+                }
+                return r;
+            });
+        }
+
         function deleteLog(e, id) {
             e.stopPropagation();
-            fetch(`/logs/${activeChannel}/${id}`, { method: 'DELETE' });
+            api(`/logs/${activeChannel}/${id}`, { method: 'DELETE' }).catch(() => { });
         }
 
         function clearLogs() {
-            fetch(`/logs/${activeChannel}`, { method: 'DELETE' });
+            api(`/logs/${activeChannel}`, { method: 'DELETE' }).catch(() => { });
         }
 
-        /* Init — fetch both channels */
+        /* Init — fetch both channels (server sends newest first) */
         Promise.all([
-            fetch('/logs/open').then(r => r.json()),
-            fetch('/logs/secure').then(r => r.json())
+            api('/logs/open').then(r => r.json()),
+            api('/logs/secure').then(r => r.json())
         ]).then(([open, secure]) => {
-            store.open = open.reverse();
-            store.secure = secure.reverse();
+            store.open = open;
+            store.secure = secure;
             refresh();
-        });
+            connectWs();
+        }).catch(() => { });
 
         /* WebSocket */
-        const protocol = location.protocol === 'https:' ? 'wss' : 'ws';
-        const ws = new WebSocket(`${protocol}://${location.host}`);
+        function connectWs() {
+            const protocol = location.protocol === 'https:' ? 'wss' : 'ws';
+            const ws = new WebSocket(`${protocol}://${location.host}/?key=${encodeURIComponent(getViewerKey())}`);
+            ws.onmessage = onWsMessage;
+        }
 
-        ws.onmessage = (e) => {
+        function onWsMessage(e) {
             const msg = JSON.parse(e.data);
 
             if (msg.type === 'NEW_LOG') {
@@ -458,7 +504,7 @@
                 if (msg.channel === activeChannel) refresh();
                 else updateTabCounts();
             }
-        };
+        }
     </script>
 
 </body>
