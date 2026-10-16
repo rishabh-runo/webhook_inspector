@@ -1,234 +1,241 @@
-# Design System Master File
+# Webhook Inspector — Modern Glassmorphism Redesign Blueprint
 
-> **LOGIC:** When building a specific page, first check `design-system/pages/[page-name].md`.
-> If that file exists, its rules **override** this Master file.
-> If not, strictly follow the rules below.
-
----
-
-**Project:** Webhook Inspector
-**Generated:** 2026-10-16 15:31:51
-**Category:** API Developer Portal
-**Design Dials:** Variance 3/10 (Centered / Minimal) | Motion 2/10 (Subtle) | Density 8/10 (Dense / Dashboard)
+> **Target Audience:** Claude Code / AI Development Agents / Frontend Developers  
+> **Design Philosophy:** Minimalist, Vercel & Linear Inspired Glassmorphism (Dark & Light Theme Support)  
+> **Priority:** Premium Developer Experience, Ultra-Sharp Micro-Borders, Zero Layout Shift, High Information Density
 
 ---
 
-## Global Rules
+## 1. Executive Summary & Core Objectives
 
-### Color Palette
+This specification outlines the total UI/UX transformation of **Webhook Inspector** from a basic dark-theme dashboard into a world-class, ultra-modern developer tool inspired by platforms like **Vercel**, **Linear**, and **Apple Developer Tools**.
 
-| Role | Hex | CSS Variable |
-|------|-----|--------------|
-| Primary | `#0F172A` | `--color-primary` |
-| On Primary | `#FFFFFF` | `--color-on-primary` |
-| Secondary | `#1E293B` | `--color-secondary` |
-| On Secondary | `#FFFFFF` | `--color-on-secondary` |
-| Accent/CTA | `#22C55E` | `--color-accent` |
-| On Accent/CTA | `#0F172A` | `--color-on-accent` |
-| Background | `#020617` | `--color-background` |
-| Foreground | `#F8FAFC` | `--color-foreground` |
-| Card | `#0E1223` | `--color-card` |
-| Card Foreground | `#F8FAFC` | `--color-card-foreground` |
-| Muted | `#1A1E2F` | `--color-muted` |
-| Muted Foreground | `#94A3B8` | `--color-muted-foreground` |
-| Border | `#334155` | `--color-border` |
-| Destructive | `#EF4444` | `--color-destructive` |
-| On Destructive | `#000000` | `--color-on-destructive` |
-| Ring | `#FFFFFF` | `--color-ring` |
-
-**Color Notes:** Code dark + endpoint green + syntax colors
-
-### Typography
-
-- **Heading Font:** JetBrains Mono
-- **Body Font:** IBM Plex Sans
-- **Mood:** code, developer, technical, precise, functional, hacker
-- **Google Fonts:** [JetBrains Mono + IBM Plex Sans](https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap)
-
-**CSS Import:**
-```css
-@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap');
-```
-
-### Spacing Variables
-
-*Density: 8/10 — Dense / Dashboard*
-
-| Token | Value | Usage |
-|-------|-------|-------|
-| `--space-xs` | `2px` / `0.125rem` | Tight gaps |
-| `--space-sm` | `4px` / `0.25rem` | Icon gaps, inline spacing |
-| `--space-md` | `8px` / `0.5rem` | Standard padding |
-| `--space-lg` | `12px` / `0.75rem` | Section padding |
-| `--space-xl` | `16px` / `1rem` | Large gaps |
-| `--space-2xl` | `24px` / `1.5rem` | Section margins |
-| `--space-3xl` | `32px` / `2rem` | Hero padding |
-
-### Shadow Depths
-
-| Level | Value | Usage |
-|-------|-------|-------|
-| `--shadow-sm` | `0 1px 2px rgba(0,0,0,0.05)` | Subtle lift |
-| `--shadow-md` | `0 4px 6px rgba(0,0,0,0.1)` | Cards, buttons |
-| `--shadow-lg` | `0 10px 15px rgba(0,0,0,0.1)` | Modals, dropdowns |
-| `--shadow-xl` | `0 20px 25px rgba(0,0,0,0.15)` | Hero images, featured cards |
+### Key Principles
+1. **Refined Translucency & Layered Depth:** Multi-layered frosted glass panels using CSS `backdrop-filter: blur(...)` over clean obsidian and slate canvases.
+2. **1px Micro-Borders & Edge Highlights:** Sharp, crisp 1px borders replace heavy drop shadows, providing a sleek "floating glass pane" aesthetic.
+3. **Strict Functionality Preservation:** Refactor visual components, layout structures, and styling without breaking underlying WebSocket connections, backend endpoints, incoming webhook parsers, or local storage state.
+4. **Dual Theme First-Class Support:** Flawless Light and Dark theme execution using cascading CSS variables tied to a single root attribute (`data-theme="dark"` / `data-theme="light"`).
 
 ---
 
-## Component Specs
+## 2. Strict Process & Execution Guidelines
 
-### Buttons
+To ensure code stability and visual excellence, all implementation work must adhere to the following strict rules:
+
+### Architectural Guidelines
+* **Zero Logic Regression:** Do not alter WebSocket handlers, request storage arrays, endpoint generation logic, or backend proxy endpoints.
+* **Single Style Cascade:** Maintain all glassmorphism tokens, component rules, and responsive media queries inside a structured CSS file tree (`public/css/style.css` or modular imports).
+* **High-Contrast Accessibility (WCAG AA):** Ensure every text element passes a minimum contrast ratio of **4.5:1** against its frosted glass background in both Light and Dark modes.
+* **No Layout Shift on Interaction:** Standardize heights for table rows, inputs, buttons, and drawers. Hover and active states must strictly use background/border transitions and subtle GPU-accelerated transforms (`translateY(-1px)` / `scale(1)`).
+* **Keyboard Focus Indicators:** Every interactive element (`button`, `a`, `input`, `select`, `tab`) must feature a distinct, visible focus ring (`2px solid var(--accent-blue)` with `2px` offset).
+
+---
+
+## 3. Comprehensive Design Tokens (CSS Variables)
+
+Copy and apply these CSS variables directly into the application stylesheet:
 
 ```css
-/* Primary Button */
-.btn-primary {
-  background: #22C55E;
-  color: #0F172A;
-  padding: 12px 24px;
-  border-radius: 8px;
-  font-weight: 600;
-  transition: all 200ms ease;
-  cursor: pointer;
+/* ==========================================================================
+   GLOBAL DESIGN TOKENS (DARK MODE DEFAULT)
+   ========================================================================== */
+:root {
+  /* Canvas & Base Layers */
+  --bg-canvas: #07090e;
+  --bg-canvas-subtle: #0b0f17;
+
+  /* Glass Panel Surfaces */
+  --glass-bg-primary: rgba(15, 23, 42, 0.65);
+  --glass-bg-secondary: rgba(30, 41, 59, 0.45);
+  --glass-bg-hover: rgba(51, 65, 85, 0.55);
+  --glass-bg-active: rgba(16, 185, 129, 0.12);
+  --glass-bg-input: rgba(15, 23, 42, 0.85);
+
+  /* Micro-Borders & Edge Highlights */
+  --border-glass: 1px solid rgba(255, 255, 255, 0.08);
+  --border-glass-bright: 1px solid rgba(255, 255, 255, 0.16);
+  --border-glass-accent: 1px solid rgba(16, 185, 129, 0.4);
+  
+  /* Border Radii */
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
+  --radius-pill: 9999px;
+
+  /* Blur Depth */
+  --blur-panel: blur(16px);
+  --blur-popover: blur(24px);
+
+  /* Typography */
+  --text-main: #f8fafc;
+  --text-muted: #94a3b8;
+  --text-subtle: #64748b;
+  --text-code: #38bdf8;
+
+  /* Brand Accents */
+  --accent-emerald: #10b981;
+  --accent-emerald-glow: rgba(16, 185, 129, 0.25);
+  --accent-blue: #3b82f6;
+  --accent-amber: #f59e0b;
+  --accent-rose: #ef4444;
+  --accent-purple: #a855f7;
+
+  /* HTTP Method Colors */
+  --method-get: #10b981;
+  --method-post: #3b82f6;
+  --method-put: #f59e0b;
+  --method-patch: #a855f7;
+  --method-delete: #ef4444;
+
+  /* Shadows & Glows */
+  --shadow-glass: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+  --shadow-glow-emerald: 0 0 16px rgba(16, 185, 129, 0.25);
+  --shadow-popover: 0 20px 40px rgba(0, 0, 0, 0.6);
+
+  /* Fonts */
+  --font-ui: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-mono: 'JetBrains Mono', monospace;
 }
 
-.btn-primary:hover {
-  opacity: 0.9;
-  transform: translateY(-1px);
-}
+/* ==========================================================================
+   LIGHT MODE GLASSMORPHISM OVERRIDES
+   ========================================================================== */
+[data-theme="light"] {
+  /* Canvas & Base Layers */
+  --bg-canvas: #f1f5f9;
+  --bg-canvas-subtle: #e2e8f0;
 
-/* Secondary Button */
-.btn-secondary {
-  background: transparent;
-  color: #F8FAFC;
-  border: 2px solid #0F172A;
-  padding: 12px 24px;
-  border-radius: 8px;
-  font-weight: 600;
-  transition: all 200ms ease;
-  cursor: pointer;
-}
-```
+  /* Glass Panel Surfaces (Light Frosted Glass) */
+  --glass-bg-primary: rgba(255, 255, 255, 0.75);
+  --glass-bg-secondary: rgba(241, 245, 249, 0.65);
+  --glass-bg-hover: rgba(226, 232, 240, 0.85);
+  --glass-bg-active: rgba(16, 185, 129, 0.15);
+  --glass-bg-input: rgba(255, 255, 255, 0.95);
 
-### Cards
+  /* Micro-Borders & Edge Highlights */
+  --border-glass: 1px solid rgba(15, 23, 42, 0.08);
+  --border-glass-bright: 1px solid rgba(15, 23, 42, 0.18);
+  --border-glass-accent: 1px solid rgba(16, 185, 129, 0.5);
 
-```css
-.card {
-  background: #020617;
-  border-radius: 12px;
-  padding: 24px;
-  box-shadow: var(--shadow-md);
-  transition: all 200ms ease;
-  cursor: pointer;
-}
+  /* Typography */
+  --text-main: #0f172a;
+  --text-muted: #475569;
+  --text-subtle: #94a3b8;
+  --text-code: #0284c7;
 
-.card:hover {
-  box-shadow: var(--shadow-lg);
-  transform: translateY(-2px);
-}
-```
+  /* HTTP Method Colors (Higher Contrast for Light Surface) */
+  --method-get: #059669;
+  --method-post: #2563eb;
+  --method-put: #d97706;
+  --method-patch: #7c3aed;
+  --method-delete: #dc2626;
 
-### Inputs
-
-```css
-.input {
-  padding: 12px 16px;
-  border: 1px solid #E2E8F0;
-  border-radius: 8px;
-  font-size: 16px;
-  transition: border-color 200ms ease;
-}
-
-.input:focus {
-  border-color: #0F172A;
-  outline: none;
-  box-shadow: 0 0 0 3px #0F172A20;
-}
-```
-
-### Modals
-
-```css
-.modal-overlay {
-  background: rgba(0, 0, 0, 0.5);
-  backdrop-filter: blur(4px);
-}
-
-.modal {
-  background: white;
-  border-radius: 16px;
-  padding: 32px;
-  box-shadow: var(--shadow-xl);
-  max-width: 500px;
-  width: 90%;
+  /* Shadows */
+  --shadow-glass: 0 8px 32px 0 rgba(31, 38, 135, 0.08);
+  --shadow-glow-emerald: 0 0 16px rgba(16, 185, 129, 0.2);
+  --shadow-popover: 0 20px 40px rgba(15, 23, 42, 0.15);
 }
 ```
 
 ---
 
-## Style Guidelines
+## 4. UI Component Specifications
 
-**Style:** Minimalism & Swiss Style
+### 4.1. Dashboard Container & Grid
+* **Layout Structure:** Max-width `1440px`, centered with `24px` horizontal padding.
+* **Panels Class:** Wrap outer container cards with `.glass-panel`:
+  ```css
+  .glass-panel {
+    background: var(--glass-bg-primary);
+    backdrop-filter: var(--blur-panel);
+    -webkit-backdrop-filter: var(--blur-panel);
+    border: var(--border-glass);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-glass);
+  }
+  ```
 
-**Keywords:** Clean, simple, spacious, functional, white space, high contrast, geometric, sans-serif, grid-based, essential
+### 4.2. Header Navigation
+* **Brand Logo:** Lightning bolt icon inside a glowing glass badge adjacent to "Webhook Inspector".
+* **Global Search Box:** Translucent pill input with inline search icon, keyboard shortcut badge (`⌘K` or `/`), and clear action button.
+* **Header Actions:**
+  * **Theme Switcher:** Moon/Sun toggle smoothly flipping `data-theme` attribute between `dark` and `light`.
+  * **Live Status Pill:** Translucent pill badge with a pulsing emerald status dot (`((•)) LIVE`).
 
-**Best For:** Enterprise apps, dashboards, documentation sites, SaaS platforms, professional tools
+### 4.3. Channel Sidebar
+* **Header:** Uppercase monospace title `CHANNELS` with an inline `+` button to launch the "New Channel" modal.
+* **Channel Pill Items:**
+  * Displays channel display name, status indicator dot, path snippet, and request count badge.
+  * **Active State:** Highlighted with `var(--glass-bg-active)`, an emerald border `var(--border-glass-accent)`, and `var(--shadow-glow-emerald)`.
 
-**Key Effects:** Subtle hover (200-250ms), smooth transitions, sharp shadows if any, clear type hierarchy, fast loading
+### 4.4. Webhook Endpoint Banner
+* **Monospace Endpoint Box:** Monospace URL container with one-click copy button providing visual feedback ("Copied!").
+* **Metadata Chips:** Compact glass badges displaying state (`ACTIVE`, `OPEN`, `200`).
+* **Quick Toggle Group:** Segmented controls for `Pause Listener`, `Notifications`, `Sound Alerts`, and `Lock Channel`.
 
-### Page Pattern
-
-**Pattern Name:** FAQ/Documentation Landing
-
-- **Conversion Strategy:** Reduce support tickets. Track search analytics. Show related articles. Contact escalation path.
-- **CTA Placement:** Search bar prominent + Contact CTA for unresolved questions
-- **Section Order:** Hero with search bar > Popular categories > FAQ accordion > Contact/support CTA
-
----
-
-## Motion
-
-**Scroll Reveal** (Subtle) — Trigger: scroll (viewport enter) | Duration: 300-400ms | Easing: `power1.out`
-
-```js
-gsap.from(el, { opacity: 0, y: 12, duration: 0.35, ease: 'power1.out', scrollTrigger: { trigger: el, start: 'top 90%', toggleActions: 'play none none reverse' } });
-```
-
-**Framework notes:** Requires the ScrollTrigger plugin registered once via gsap.registerPlugin(ScrollTrigger); Use matchMedia('(prefers-reduced-motion: reduce)') to skip non-essential motion and render the final state immediately
-
-- ✅ Keep the y offset small (8-16px) so it reads as a fade, not a slide
-- ❌ Don't reveal below-the-fold content needed for SEO/crawlers as invisible-by-default without a no-JS fallback
-- ⚡ toggleActions 'play none none reverse' avoids re-triggering on every scroll direction change
-
----
-
-## Anti-Patterns (Do NOT Use)
-
-- ❌ Buried endpoints
-- ❌ Broken version switching
-- ❌ missing rate-limit state
-
-### Additional Forbidden Patterns
-
-- ❌ **Emojis as icons** — Use SVG icons (Heroicons, Lucide, Simple Icons)
-- ❌ **Missing cursor:pointer** — All clickable elements must have cursor:pointer
-- ❌ **Layout-shifting hovers** — Avoid scale transforms that shift layout
-- ❌ **Low contrast text** — Maintain 4.5:1 minimum contrast ratio
-- ❌ **Instant state changes** — Always use transitions (150-300ms)
-- ❌ **Invisible focus states** — Focus states must be visible for a11y
+### 4.5. Log Table & Inspection Drawer
+* **Toolbar Bar:** Request count (`3 of 12 LOGS`), filter toggle button, and quick logs management (`Compare 0/2`, `Export`, `Import`, `Clear`).
+* **Row Card Structure:**
+  * 44px compact height.
+  * Left border indicator (3px width) colored dynamically by HTTP Method (`POST`: Blue, `GET`: Green, `PUT`: Amber, `DELETE`: Red).
+* **Multi-Tab Payload Inspector:**
+  * Segmented navigation tabs (`Summary`, `Headers`, `Query`, `Body (JSON)`, `Response`, `Timing`).
+  * Inset code viewer with dark glass styling, JetBrains Mono font, line numbering, and JSON syntax highlighting.
 
 ---
 
-## Pre-Delivery Checklist
+## 5. Strategic Enhancements (Added Value Features)
 
-Before delivering any UI code, verify:
+To make Webhook Inspector standard-setting for modern developers, the following visual and functional enhancements are integrated into this overhaul:
 
-- [ ] No emojis used as icons (use SVG instead)
-- [ ] All icons from consistent icon set (Heroicons/Lucide)
-- [ ] `cursor-pointer` on all clickable elements
-- [ ] Hover states with smooth transitions (150-300ms)
-- [ ] Light mode: text contrast 4.5:1 minimum
-- [ ] Focus states visible for keyboard navigation
-- [ ] `prefers-reduced-motion` respected
-- [ ] Responsive: 375px, 768px, 1024px, 1440px
-- [ ] No content hidden behind fixed navbars
-- [ ] No horizontal scroll on mobile
+### 🚀 Enhancement 1: Instant "Send Test Webhook" Action (Onboarding)
+* **Problem:** New users land on an empty log workspace and must open cURL or Postman to test their webhook endpoint.
+* **Solution:** Add a single-click `"Send Sample Webhook"` button inside empty state screens. Triggering this sends a synthetic JSON payload (`{"event": "user.signup", "status": "success"}`) directly to the active channel for immediate visual validation.
+
+### ⚡ Enhancement 2: One-Click cURL Generator & Replay Tool
+* **Problem:** Developers often need to reproduce an incoming webhook locally or resend it after fixing a bug.
+* **Solution:** 
+  1. Add a **"Copy as cURL"** option in the floating `...` log action menu.
+  2. Add a **"Resend Request"** button that re-fires the stored payload, headers, and method back to the client or target server.
+
+### 🔍 Enhancement 3: Interactive JSON Diff Viewer
+* **Problem:** Comparing two similar webhook payloads (e.g. order updates) line-by-line is tedious.
+* **Solution:** Utilize the existing `Compare 0/2` feature to launch a side-by-side glass modal diffing two selected requests, highlighting added, removed, or modified JSON properties in green and red.
+
+### ⌨️ Enhancement 4: Developer Keyboard Shortcuts
+* Implement instant hotkeys for common workflows:
+  * `/` or `⌘K` → Focus global search field
+  * `J` / `K` → Navigate up/down through the log list
+  * `Space` → Expand / collapse selected request log
+  * `C` → Copy active endpoint URL
+  * `Esc` → Close open modals or drawers
+
+### 📊 Enhancement 5: High-Volume Buffer Indicator & Virtualized Rendering
+* **Problem:** Heavy webhook traffic (100+ req/sec) can cause browser DOM lag.
+* **Solution:** Add a subtle frosted buffer status badge showing inbound throughput rate (`e.g., 24 req/s`). Utilize virtual list DOM rendering for request history items exceeding 100 rows.
+
+---
+
+## 6. Implementation Checklist & Roadmap for Claude Code
+
+Execute the refactoring sequentially according to this checklist:
+
+- [ ] **Step 1: CSS Variables Injection**
+  - Inject global tokens into `public/css/style.css` for both dark and light modes.
+  - Test theme switching logic via browser console.
+- [ ] **Step 2: HTML Layout Wrap**
+  - Wrap top header, sidebar, endpoint banner, and request list containers in `.glass-panel` cards.
+  - Replace emojis with inline SVG Lucide icons.
+- [ ] **Step 3: Component Styling & Method Color Coding**
+  - Apply method border accents for GET, POST, PUT, PATCH, DELETE.
+  - Refactor channel buttons and search input fields to glass style.
+- [ ] **Step 4: Interactive States & Dropdowns**
+  - Implement backdrop blur popovers for Advanced Filters and `...` log action menus.
+  - Implement smooth expand/collapse transitions for request detail drawers.
+- [ ] **Step 5: Enhanced Features Rollout**
+  - Add "Send Test Webhook" trigger to empty state views.
+  - Integrate cURL generator into log item action menus.
+  - Wire up keyboard shortcuts (`⌘K`, `J/K`, `Esc`).
+- [ ] **Step 6: Accessibility & Final Review**
+  - Confirm WCAG AA contrast for text and status indicators in both themes.
+  - Ensure focus rings appear on keyboard `Tab` navigation.
