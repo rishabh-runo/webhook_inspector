@@ -110,3 +110,31 @@ export function toCurl(log, origin) {
     }
     return prefix + parts.join(' \\\n  ');
 }
+
+// Headers the browser forbids, hop-by-hop ones, and masked secrets are left out of a replay
+const SKIP_RESEND_HEADERS = new Set([
+    'host', 'content-length', 'connection', 'keep-alive', 'transfer-encoding', 'upgrade', 'te', 'trailer',
+    'expect', 'cookie', 'cookie2', 'origin', 'referer', 'user-agent', 'accept-encoding', 'accept-charset',
+    'date', 'dnt', 'via', 'access-control-request-headers', 'access-control-request-method'
+]);
+
+/* Re-fires a stored request (method, headers, body) to the same channel URL; resolves to the status code */
+export async function resendRequest(log) {
+    const headers = {};
+    for (const [name, value] of Object.entries(log.headers || {})) {
+        const lower = name.toLowerCase();
+        if (SKIP_RESEND_HEADERS.has(lower) || lower.startsWith('sec-') || lower.startsWith('proxy-') || value === '***') continue;
+        headers[lower] = Array.isArray(value) ? value.join(', ') : String(value);
+    }
+
+    const method = cleanMethod(log.method);
+    let body;
+    if (method !== 'GET' && method !== 'HEAD') {
+        body = log.rawEncoding === 'base64' && log.rawBody
+            ? Uint8Array.from(atob(log.rawBody), c => c.charCodeAt(0))
+            : bodyText(log) || undefined;
+    }
+
+    const res = await fetch(log.url, { method, headers, body });
+    return res.status;
+}

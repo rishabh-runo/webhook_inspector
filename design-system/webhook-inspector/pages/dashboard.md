@@ -1,48 +1,34 @@
-# Dashboard overrides (Webhook Inspector)
+# Dashboard decisions (Webhook Inspector)
 
-These rules override `MASTER.md` for the dashboard (`public/`). MASTER's "FAQ/Documentation Landing" pattern does not apply: this is a single-page tool.
+`MASTER.md` is the glassmorphism redesign blueprint and wins on everything it states. This file records how its open points were settled (agreed 2026-10-16), so later UI work stays consistent.
 
-## Layout
-- Title bar across the top, then two columns: a vertical channel sidebar (`--sidebar-w`, `--strip` colour, sticky) and the main column.
-- Sidebar rows: 44px, name + mono `/hook/<id>`, status icons, count badge, close `×` on hover/active. Active row = `--chrome` background + 2px accent bar on the left.
-- Below 720px the sidebar turns into a horizontally scrollable row (paths and the "New channel" label hidden).
-- Copyright bar fixed to the bottom (`--footer-h`); body padding keeps content clear of it.
-- Toolbar band, three rows:
-  1. Channel name + endpoint pill (copy icon inside), chips on a line below; right side: segmented `Pause | Notify | Sound` + Settings/Lock.
-  2. Search + styled selects + **Starred** toggle chip (`aria-pressed`, filled amber star + count when on) + "Reset" (only while a filter is active). Active selects get the accent tint (`.is-set`).
-  3. List bar above the logs: count (`3 of 12 logs`) on the left, Compare / Export / Import / Clear on the right.
-- Never pair a checkbox with an icon for the same toggle; use one toggle chip.
-- Log list: dense cards, 44px header rows, 3px left border in the method colour.
+## Settled with the product owner
+- **Inspector**: opens inline as a drawer under the row (smooth expand/collapse), not a side panel.
+- **Resend Request**: re-fires the stored method, headers and body to the same channel URL from the browser. No forwarding to other URLs.
+- **Contrast**: blueprint tokens are used exactly as written. Colours under 4.5:1 on light glass (`--accent-emerald`, `--accent-amber`, `--method-get`, `--method-put`, `--text-code`, `--text-subtle`) are used only for borders, dots and icons; text uses `--text-main` / `--text-muted`, and errors use `--method-delete` (passes in both themes).
+- **Lock Channel**: shown in the toggle group only on a password-protected channel this browser has unlocked; it forgets the password.
 
-## Theme
-- Dark first (MASTER palette). Light is opt-in via the theme toggle (`data-theme="light"`).
-- Light palette: bg `#F8FAFC`, card `#FFFFFF`, border `#E2E8F0`, text `#0F172A`, muted `#475569`, accent `#15803D` (green-700, AA on white).
-- All text pairs checked at WCAG AA 4.5:1 or better in both themes.
+## Changes the product owner asked for after review (override MASTER.md)
+- **Full width**: no 1440 px cap; the app fills the screen (24 px padding).
+- **Softer light theme**: canvas `#dfe5ec` / `#d2dae4`, glass `rgba(241,245,249,.78)`, secondary `rgba(226,232,240,.6)`, hover `rgba(203,213,225,.75)`, input `rgba(248,250,252,.9)`. Error text in light uses `--text-danger` (a darker mix of `--method-delete`) to keep 4.5:1 on the greys.
+- **Filters**: always-visible chip bar under the log toolbar (no popover), one bordered box per group (METHOD, STATUS, TIME, SHOW) with the label inside. Each group starts with an "All"/"Any" chip that is selected while the group isn't filtering; clicking it clears the group. Method and Status are multi-select, Time is one window, Show = All / Starred. Unselected chips look the same whatever their count; a selected chip gets a coloured fill + border, bold text and a check mark instead of the dot ("All" uses a neutral highlight). "Reset filters" sits at the right while any filter or search is on.
+- **Collapse all**: toolbar button (disabled when nothing is open) and `Shift+C`.
+- **Channel row end**: the count badge and the delete × share one slot; the × replaces the count on hover or keyboard focus (no reserved gap). Touch screens and the phone strip show both side by side.
+- **Favicon & title**: `public/favicon.svg` (emerald bolt on obsidian); page title = `<channel name> · Webhook Inspector`, with the unread count in front while the tab is hidden.
+- **Channel icons**: icon in front of each channel = lock (password, locked) / open lock (unlocked here) / shield (auth-key required) / globe (open). Icon colour = state: green live, amber paused, muted locked; a small pause icon also shows when paused.
 
-## Colour roles
-| Role | Dark | Light |
-|---|---|---|
-| GET | `#22C55E` | `#15803D` |
-| POST | `#60A5FA` | `#1D4ED8` |
-| PUT | `#FBBF24` | `#B45309` |
-| PATCH | `#C084FC` | `#7E22CE` |
-| DELETE | `#F87171` | `#B91C1C` |
+## Interpretations of the blueprint
+- Styles live in `public/css/style.css`. Fonts: Inter (UI) + JetBrains Mono (code).
+- App shell: every region a `.glass-panel`; canvas = `--bg-canvas` with a `--bg-canvas-subtle` top fade, no decorative gradients.
+- Header: brand badge, global search pill (current channel's logs; `/` or Ctrl/⌘K; clear button), req/s badge, LIVE pill with pulsing dot, sun/moon theme toggle, shortcuts button.
+- Sidebar rows: security icon (see above), name, path, count, × on hover/active. `+` in the `CHANNELS` header.
+- Banner: endpoint box with Copy → "Copied!", uppercase chips (ACTIVE/PAUSED, OPEN/AUTH-KEY, status, extra state), segmented `Pause Listener | Notifications | Sound Alerts | Lock Channel`, Settings button.
+- Log toolbar: `N of M LOGS`, Collapse all, Compare, Export (menu), Import, Clear; filter chip bar below it.
+- Rows: 44 px, 3 px method border, compare checkbox + star visible; `...` menu = Copy as cURL, Resend Request, Delete.
+- Inspector tabs: Summary, Headers, Query, Body (JSON) with Parsed/Raw switch, Response, Timing. Code viewer: dark glass in both themes, line numbers, JSON colours, no folding.
+- Primary buttons use the inverted surface (`--text-main` background, `--bg-canvas` text).
+- Above 100 logs only rows near the viewport are rendered.
+- Kept although not in the blueprint (existing functionality): Settings, paused banner, password lock screen, footer credit, keyboard help.
 
-## Type
-- IBM Plex Sans 14px / 1.5 for UI text.
-- JetBrains Mono for anything code-like: URLs, methods, status codes, badges, sizes, times, JSON, the title.
-- Minimum 11px only for badges and kbd; body text never below 12px.
-
-## Icons
-- Lucide outline icons, inline SVG sprite in `index.html`, used via `icon(name)` in `public/js/utils.js`.
-- One family only, no emoji. Decorative icons get `aria-hidden="true"`; icon-only buttons get `aria-label` and `aria-pressed` for toggles.
-- (MASTER suggests Phosphor/Heroicons; Lucide chosen because it works as an inline sprite with no build step.)
-
-## Shape and motion
-- Radius 6px (cards), 4px (controls), 8px only for tab tops and dialogs.
-- No glows or heavy shadows. Hover changes border/background in 150ms.
-- Chevrons rotate 90° for expand. `prefers-reduced-motion` turns transitions off.
-
-## Interaction
-- Visible focus ring on every control (`--ring`).
-- Touch screens (`pointer: coarse`): icon buttons and tabs grow to 44px.
+## Shortcuts
+`/` or Ctrl/⌘K search · J/K move · Space (also O, Enter) expand · C copy endpoint URL · Shift+C collapse all · S star · X compare · P pause · [ ] channel · N/M alerts · T theme · ? help · Esc closes menus, drawers, dialogs.
