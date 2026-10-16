@@ -9,6 +9,11 @@ export function esc(value) {
 
 export const COMMON_METHODS = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'];
 
+/* Inline SVG from the sprite in index.html; decorative, so hidden from screen readers */
+export function icon(name, cls = '') {
+    return `<svg class="i${cls ? ` ${cls}` : ''}" aria-hidden="true"><use href="#i-${name}"></use></svg>`;
+}
+
 export function cleanMethod(method) {
     return String(method || '').replace(/[^A-Za-z]/g, '').toUpperCase() || 'GET';
 }

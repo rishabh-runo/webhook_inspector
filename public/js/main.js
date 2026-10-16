@@ -1,6 +1,6 @@
 import { api, wsUrl, setToken, dropToken, tokenVersion, allTokens } from './api.js';
 import { connectLive } from './ws.js';
-import { esc, cleanMethod, COMMON_METHODS, relTime, debounce, copyText, toast, toCurl } from './utils.js';
+import { esc, cleanMethod, COMMON_METHODS, relTime, debounce, copyText, toast, toCurl, icon } from './utils.js';
 import { renderCard, sectionsHtml, sectionContent, sectionCopyText, renderEmpty } from './render.js';
 import { toggleJsonNode } from './json-view.js';
 import { diffHtml } from './diff.js';
@@ -127,6 +127,7 @@ function rebuild() {
     const ch = activeChannel();
     const locked = lockedOut(ch);
     document.querySelector('.filters').hidden = locked;
+    $('list-bar').hidden = locked;
     if (locked) {
         visible = [];
         renderedCount = 0;
@@ -148,7 +149,7 @@ function rebuild() {
 function renderLocked(ch) {
     return `
     <form class="locked" id="unlock-form">
-      <div class="lock-icon">🔒</div>
+      ${icon('lock', 'lock-icon')}
       <h3>${esc(ch.name)} is password protected</h3>
       <p class="muted">Enter the channel password to see its logs. Webhooks are still captured.</p>
       <div class="unlock-row">
@@ -210,8 +211,11 @@ function replaceInView(log) {
 
 function updateCounts() {
     const total = activeLogs().length;
-    $('count').textContent = lockedOut(activeChannel()) ? 'Locked'
-        : isFiltered() ? `${visible.length} of ${total} logs` : `${total} logs`;
+    $('count').innerHTML = isFiltered()
+        ? `<strong>${visible.length}</strong> of ${total} logs`
+        : `<strong>${total}</strong> log${total === 1 ? '' : 's'}`;
+    $('starred-count').textContent = activeLogs().filter(l => l.pinned).length;
+    $('btn-reset-filters').hidden = !isFiltered();
     state.channels.forEach(ch => {
         const badge = document.querySelector(`.tab[data-channel="${CSS.escape(ch.id)}"] .badge`);
         if (badge) badge.textContent = (state.logs[ch.id] || []).length;
@@ -223,26 +227,30 @@ function renderTabs() {
     $('tabs').innerHTML = state.channels.map(ch => {
         const active = ch.id === state.active;
         const alerts = notify.getAlerts(ch.id);
-        const alertIcons = `${alerts.notify ? '🔔' : ''}${alerts.sound ? '🔊' : ''}`;
+        const alertIcons = `${alerts.notify ? icon('bell') : ''}${alerts.sound ? icon('volume') : ''}`;
         return `
     <div class="tab${active ? ' active' : ''}" role="tab" tabindex="0" aria-selected="${active}"
          data-channel="${esc(ch.id)}" title="${esc(ch.name)} · /hook/${esc(ch.id)}">
-      ${ch.locked ? `<span class="tab-icon" title="${lockedOut(ch) ? 'Password protected' : 'Password protected (unlocked here)'}">${lockedOut(ch) ? '🔒' : '🔓'}</span>` : ''}
-      ${ch.requireAuth ? '<span class="tab-icon" title="Senders need the auth-key header">🔑</span>' : ''}
-      <span class="tab-name">${esc(ch.name)}</span>
-      ${alertIcons ? `<span class="tab-icon" title="Alerts on for this channel">${alertIcons}</span>` : ''}
-      ${state.paused.has(ch.id) ? '<span class="tab-icon" title="Live feed paused">⏸</span>' : ''}
+      ${ch.locked ? `<span class="tab-icon" title="${lockedOut(ch) ? 'Password protected' : 'Password protected (unlocked here)'}">${icon(lockedOut(ch) ? 'lock' : 'lock-open')}</span>` : ''}
+      ${ch.requireAuth ? `<span class="tab-icon" title="Senders need the auth-key header">${icon('key')}</span>` : ''}
+      <span class="tab-text">
+        <span class="tab-name">${esc(ch.name)}</span>
+        <span class="tab-path">/hook/${esc(ch.id)}</span>
+      </span>
+      ${alertIcons ? `<span class="tab-icon accent" title="Alerts on for this channel">${alertIcons}</span>` : ''}
+      ${state.paused.has(ch.id) ? `<span class="tab-icon warn" title="Live feed paused">${icon('pause')}</span>` : ''}
       ${lockedOut(ch) ? '' : `<span class="badge">${(state.logs[ch.id] || []).length}</span>`}
-      ${ch.builtin || lockedOut(ch) ? '' : `<button class="tab-close" data-action="close" title="Delete channel" aria-label="Delete channel ${esc(ch.name)}">×</button>`}
+      ${ch.builtin || lockedOut(ch) ? '' : `<button class="tab-close" data-action="close" title="Delete channel" aria-label="Delete channel ${esc(ch.name)}">${icon('x')}</button>`}
     </div>`;
     }).join('') +
-        '<button class="tab-new" data-action="new-channel" title="New channel" aria-label="New channel">+</button>';
+        `<button class="tab-new" data-action="new-channel" title="New channel" aria-label="New channel">${icon('plus')}<span class="tab-new-label">New channel</span></button>`;
 }
 
 function renderChannelBar() {
     const ch = activeChannel();
     if (!ch) return;
     $('endpoint-url').textContent = `${origin}/hook/${ch.id}`;
+    $('channel-name').textContent = ch.name;
 
     // Built-in channels are fixed; locked channels show nothing until unlocked
     const locked = lockedOut(ch);
@@ -255,15 +263,15 @@ function renderChannelBar() {
     updatePauseUi();
 
     const chips = [];
-    if (ch.builtin) chips.push('<span class="chip">built-in · fixed</span>');
-    if (ch.locked) chips.push('<span class="chip">🔒 password</span>');
+    if (ch.builtin) chips.push(`<span class="chip">${icon('pin')}built-in · fixed</span>`);
+    if (ch.locked) chips.push(`<span class="chip">${icon('lock')}password</span>`);
     chips.push(ch.requireAuth
-        ? `<span class="chip${ch.hasAuthKey ? '' : ' warn'}">🔑 auth-key${ch.hasAuthKey ? '' : ' (AUTH_KEY not set in .env: rejects all)'}</span>`
-        : '<span class="chip">open</span>');
+        ? `<span class="chip${ch.hasAuthKey ? '' : ' warn'}">${icon('key')}auth-key${ch.hasAuthKey ? '' : ' (AUTH_KEY not set in .env: rejects all)'}</span>`
+        : `<span class="chip">${icon('globe')}open</span>`);
     const r = ch.response;
-    chips.push(`<span class="chip">↩ ${r.status}${r.delayMs ? ` · ${r.delayMs} ms delay` : ''}</span>`);
+    chips.push(`<span class="chip mono">${icon('reply')}${r.status}${r.delayMs ? ` · ${r.delayMs} ms` : ''}</span>`);
     if (ch.signature.type !== 'none') {
-        chips.push(`<span class="chip${ch.signature.hasSecret ? '' : ' warn'}">✍ ${esc(ch.signature.type)}${ch.signature.hasSecret ? '' : ' (no secret)'}</span>`);
+        chips.push(`<span class="chip${ch.signature.hasSecret ? '' : ' warn'}">${icon('pen')}${esc(ch.signature.type)}${ch.signature.hasSecret ? '' : ' (no secret)'}</span>`);
     }
     $('channel-chips').innerHTML = chips.join('');
 }
@@ -419,7 +427,10 @@ function handleMessage(msg) {
             const logs = state.logs[msg.channel] || [];
             const idx = logs.findIndex(l => l.id === msg.data.id);
             if (idx !== -1) logs[idx] = msg.data;
-            if (msg.channel === state.active) replaceInView(msg.data);
+            if (msg.channel === state.active) {
+                replaceInView(msg.data);
+                updateCounts();
+            }
             break;
         }
         case 'DELETE_LOG':
@@ -469,21 +480,17 @@ function toggleExpand(id) {
         const body = el.querySelector('.log-body');
         if (!body.innerHTML.trim()) body.innerHTML = sectionsHtml(log, sectionsFor(id));
     }
-    el.querySelector('.arrow').textContent = state.expanded.has(id) ? '⯆' : '⯈';
 }
 
 function toggleSection(id, sectionEl) {
     const key = sectionEl.dataset.section;
     const open = sectionsFor(id);
-    const title = sectionEl.querySelector('.section-title');
     if (open.has(key)) {
         open.delete(key);
         sectionEl.classList.remove('open');
-        title.textContent = title.textContent.replace('⯆', '⯈');
     } else {
         open.add(key);
         sectionEl.classList.add('open');
-        title.textContent = title.textContent.replace('⯈', '⯆');
         const body = sectionEl.querySelector('.section-body');
         if (!body.innerHTML.trim()) body.innerHTML = sectionContent(key, findLog(id));
     }
@@ -526,7 +533,7 @@ function toggleCompare(id, on = !state.compare.includes(id)) {
 
 function updateCompareButton() {
     const btn = $('btn-compare');
-    btn.textContent = `Compare ${state.compare.length}/2`;
+    btn.innerHTML = `${icon('compare')}Compare ${state.compare.length}/2`;
     btn.disabled = state.compare.length !== 2;
 }
 
@@ -557,8 +564,9 @@ function updatePauseUi() {
     const paused = state.paused.has(state.active) && !lockedOut(activeChannel());
     const waiting = state.held.get(state.active)?.size || 0;
     const btn = $('btn-pause');
-    btn.textContent = paused ? '▶ Resume' : '⏸ Pause';
+    btn.innerHTML = paused ? `${icon('play')}Resume` : `${icon('pause')}Pause`;
     btn.classList.toggle('on', paused);
+    btn.setAttribute('aria-pressed', paused);
     $('paused-banner').hidden = !paused;
     $('paused-text').textContent = waiting
         ? `This channel is paused · ${waiting} new request${waiting > 1 ? 's' : ''} waiting`
@@ -589,8 +597,7 @@ function moveSelection(dir) {
 }
 
 function toggleTheme() {
-    const current = document.documentElement.dataset.theme ||
-        (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+    const current = document.documentElement.dataset.theme || 'dark'; // dark-first
     const next = current === 'dark' ? 'light' : 'dark';
     document.documentElement.dataset.theme = next;
     try { localStorage.setItem('theme', next); } catch { }
@@ -600,10 +607,12 @@ function updateAlertButtons() {
     const ch = activeChannel();
     if (!ch) return;
     const a = notify.getAlerts(ch.id);
-    $('btn-ch-notify').textContent = a.notify ? '🔔 Notify on' : '🔕 Notify';
+    $('btn-ch-notify').innerHTML = a.notify ? `${icon('bell')}Notify on` : `${icon('bell-off')}Notify`;
     $('btn-ch-notify').classList.toggle('on', a.notify);
-    $('btn-ch-sound').textContent = a.sound ? '🔊 Sound on' : '🔇 Sound';
+    $('btn-ch-notify').setAttribute('aria-pressed', a.notify);
+    $('btn-ch-sound').innerHTML = a.sound ? `${icon('volume')}Sound on` : `${icon('volume-x')}Sound`;
     $('btn-ch-sound').classList.toggle('on', a.sound);
+    $('btn-ch-sound').setAttribute('aria-pressed', a.sound);
 }
 
 /* ----------- EVENTS ----------- */
@@ -690,7 +699,11 @@ $('tabs').addEventListener('keydown', (e) => {
         switchChannel(tab.dataset.channel);
         document.querySelector(`.tab[data-channel="${CSS.escape(tab.dataset.channel)}"]`)?.focus();
     } else if (e.key === 'Delete') closeChannel(tab.dataset.channel);
-    else return;
+    else if (e.key === 'ArrowDown' || e.key === 'ArrowUp' || e.key === 'ArrowRight' || e.key === 'ArrowLeft') {
+        const tabs = [...$('tabs').querySelectorAll('.tab')];
+        const step = e.key === 'ArrowDown' || e.key === 'ArrowRight' ? 1 : -1;
+        tabs[(tabs.indexOf(tab) + step + tabs.length) % tabs.length]?.focus();
+    } else return;
     e.preventDefault();
     e.stopPropagation(); // keep the global shortcuts from also handling it
 });
@@ -745,14 +758,30 @@ const applyText = debounce(() => {
 }, 150);
 $('f-text').addEventListener('input', applyText);
 
-[['f-method', 'method'], ['f-status', 'status'], ['f-range', 'range']].forEach(([elId, key]) => {
+const FILTER_SELECTS = [['f-method', 'method'], ['f-status', 'status'], ['f-range', 'range']];
+
+FILTER_SELECTS.forEach(([elId, key]) => {
     $(elId).addEventListener('change', (e) => {
         state.filters[key] = e.target.value;
+        e.target.classList.toggle('is-set', !!e.target.value); // highlight active filters
         rebuild();
     });
 });
-$('f-starred').addEventListener('change', (e) => {
-    state.filters.starred = e.target.checked;
+
+$('f-starred').addEventListener('click', () => {
+    state.filters.starred = !state.filters.starred;
+    $('f-starred').setAttribute('aria-pressed', state.filters.starred);
+    rebuild();
+});
+
+$('btn-reset-filters').addEventListener('click', () => {
+    state.filters = { text: '', method: '', status: '', range: '', starred: false };
+    $('f-text').value = '';
+    FILTER_SELECTS.forEach(([elId]) => {
+        $(elId).value = '';
+        $(elId).classList.remove('is-set');
+    });
+    $('f-starred').setAttribute('aria-pressed', 'false');
     rebuild();
 });
 
@@ -866,6 +895,7 @@ setInterval(() => {
 }, 10000);
 
 updatePauseUi();
+updateCompareButton();
 $('year').textContent = new Date().getFullYear();
 
 loadAll()

@@ -1,167 +1,190 @@
 # Webhook Inspector
 
-A lightweight, real-time webhook inspection tool built with Node.js. It captures incoming HTTP requests (Vonage, Stripe, GitHub, anything), keeps them in memory, and streams them live to a browser dashboard over WebSocket.
+A self-hosted tool to **catch, inspect and debug webhooks** in real time.
 
-Intended for local development and debugging. Logs and custom channels live in memory and are wiped on restart.
+Point any service (Vonage, Stripe, GitHub, Twilio, your own app) at a Webhook Inspector URL and every request it sends is captured in full: method, headers, query, body, raw body, sender IP and timing. Logs stream live to the dashboard the moment they arrive.
+
+Built with Node.js, Express and WebSockets. No database: everything lives in memory.
 
 ---
 
 ## Features
 
-**Capturing**
-- Any HTTP method, any content type: JSON, form, text, XML, binary (stored as base64)
-- Raw body kept exactly as received (needed for signature checks)
-- Sub-paths are captured too: `/hook/<channel>/anything/here`
-- Per-log size, duration, source IP, response headers and body
-
-**Channels**
-- Built-in `open` (no auth) and `secure` (`auth-key` = `AUTH_KEY`). These are fixed: they can't be edited or deleted.
-- Chrome-style tab bar: `+` creates a channel, `×` (or middle-click, or `Delete` on a focused tab) deletes one. You're asked to confirm only if the channel has logs.
-- Create, edit and delete channels from the UI, each with its own:
-  - optional password: only people who enter it can see the channel's logs or change its settings
-  - optional `auth-key`
-  - custom response: status, headers, body, delay (0-30 s)
-  - signature check: Vonage JWT, Stripe, GitHub, or generic HMAC SHA-256
-- Signature results show on each log as `✓ signed` / `✗ signature` (hover for the reason). Requests are never rejected for a bad signature, only labelled.
-
-**Dashboard**
-- Live feed with auto-reconnect and a Live / Reconnecting / Disconnected indicator
-- Pause and resume the live feed per channel (⏸ on the tab); held requests show on resume
-- Search (url, headers, body, response) and filters (method, status, time range, starred)
-- Collapsible, syntax-coloured JSON viewer
-- Copy endpoint URL, any section, or a whole request as cURL
-- Star logs: starred logs survive Clear and the log cap
-- Compare two logs side by side (diff)
-- Export JSON or HAR; import JSON exports or HAR files
-- Light / dark theme (follows system by default), works on phones
-- Per-channel desktop notification and/or sound (off by default). Alerts fire for enabled channels only, and not while you're already looking at that channel. Saved per browser.
-- Keyboard shortcuts (press `?`)
-- Renders 50 cards at a time and loads more on scroll; new logs are inserted without re-rendering the list
+- **Catch any request**: any HTTP method, any content type (JSON, form, text, XML, binary). The raw body is kept exactly as received.
+- **Channels**: separate webhook URLs (`/hook/<channel>`), each with its own logs and settings. Sub-paths are captured too (`/hook/<channel>/any/path`).
+- **Custom responses**: choose the status code, headers, body and an optional delay (up to 30 s) each channel replies with. Useful for testing retries, timeouts and error handling.
+- **Sender authentication**: optionally require an `auth-key` header; requests without it get `401`.
+- **Signature verification**: check Vonage (JWT), Stripe, GitHub or generic HMAC SHA-256 signatures. Each log is marked valid or invalid with the reason.
+- **Channel passwords**: protect a channel so only people with the password can view its logs or change its settings.
+- **Live updates**: new logs are pushed to every open dashboard over WebSocket.
+- **Search and filter**: by text, method, status class and time range; star important logs.
+- **Replay and share**: copy any request as a cURL command, export logs as JSON or HAR, import them elsewhere, compare two requests side by side.
+- **Alerts**: optional desktop notification or sound per channel.
+- **Safe by default**: sensitive headers are masked in logs, secrets are never sent to the browser, CORS is limited to webhook endpoints.
 
 ---
 
-## Project Structure
+## Requirements
 
-```
-webhook_inspector/
-├── index.js              # Express + WebSocket server, routes, channel store
-├── lib/
-│   ├── signature.js      # Vonage / Stripe / GitHub / HMAC verification
-│   └── validate.js       # Channel config validation, import sanitizing, header masking
-├── public/
-│   ├── index.html        # Dashboard markup
-│   ├── css/app.css       # Styles + light/dark theme tokens
-│   └── js/
-│       ├── main.js       # State, list rendering, events, keyboard shortcuts
-│       ├── api.js        # fetch wrapper, channel access tokens, WebSocket URL
-│       ├── ws.js         # WebSocket with backoff reconnect
-│       ├── render.js     # Log card + section rendering
-│       ├── json-view.js  # Collapsible JSON tree
-│       ├── channels.js   # Create / edit channel dialog
-│       ├── diff.js       # Side-by-side diff
-│       ├── export.js     # JSON / HAR export and import parsing
-│       ├── notify.js     # Notifications, sound, unread title count
-│       └── utils.js      # Escaping, formatting, clipboard, cURL builder
-└── package.json
-```
-
-No build step: the browser loads the JS files as ES modules.
+- Node.js 18 or newer
+- npm
 
 ---
 
-## Environment Variables
-
-Create a `.env` file in the project root:
-
-```env
-AUTH_KEY=your_secret_key_here
-```
-
-| Variable | Used as | Default |
-|---|---|---|
-| `AUTH_KEY` | `auth-key` header required by `/hook/secure` (unset = all rejected) | none |
-| `PORT` | HTTP/WS port | `3000` |
-| `MAX_LOGS` | Max logs kept per channel (oldest unstarred dropped) | `500` |
-| `MAX_CHANNELS` | Max number of channels | `50` |
-| `BODY_LIMIT` | Max request body size | `10mb` |
-| `TRUST_PROXY` | Express `trust proxy` setting, so the logged IP is the real client behind ngrok / a proxy (`true`, a hop count, or a subnet) | unset |
-
-Sensitive headers (`auth-key`, `channel-token`, `authorization`, `cookie`) are masked as `***` in logs. Signatures are checked before masking.
-
----
-
-## Channel Passwords
-
-The dashboard is open to everyone. To keep a channel private, set a password in its **⚙ Settings**.
-
-- Everyone still sees the channel's name and webhook URL in the tab bar.
-- Without the password, the channel shows a lock screen: no logs, no live updates, no settings, no delete.
-- After unlocking, this browser remembers it (🔓 on the tab). **🔒 Lock** forgets it.
-- Changing or removing the password logs everyone else out of that channel.
-- Webhook senders don't need the password (use `auth-key` for that).
-- Built-in `open` and `secure` can't have a password.
-
-How it works: the password is hashed with scrypt (never stored in plain text). Unlocking returns an HMAC access token for that channel, sent as the `channel-token` header and in the WebSocket `AUTH` message. Tokens stop working when the password changes or the server restarts. 10 wrong passwords from one IP lock unlocking for 10 minutes.
-
-> **Security note:** channels without a password can be viewed, edited and deleted by anyone who can reach the server. Protect any channel that matters, and use HTTPS when the server is exposed.
-
----
-
-## Running the Server
+## Quick start
 
 ```bash
+git clone https://github.com/rishabh-runo/webhook_inspector.git
+cd webhook_inspector
 npm install
+```
+
+Create a `.env` file in the project root (optional, see [Configuration](#configuration)):
+
+```env
+AUTH_KEY=change-me
+```
+
+Start the server:
+
+```bash
 npm start
 ```
 
-Open **http://localhost:3000** (or your `PORT`).
-
----
-
-## Webhook Endpoints
-
-### `ALL /hook/:channel` and `ALL /hook/:channel/*`
-
-| | |
-|---|---|
-| Auth | `auth-key` header, only if the channel requires it |
-| Response | The channel's custom response (default `200 {"status":"OK"}`) |
-| Unknown channel | `404`, not logged |
-| CORS | Enabled (only on `/hook/*`) |
+Open **http://localhost:3000** to see the dashboard, then send a test webhook:
 
 ```bash
-curl -X POST http://localhost:3000/hook/secure \
-  -H "auth-key: $AUTH_KEY" \
+curl -X POST http://localhost:3000/hook/open \
   -H "Content-Type: application/json" \
-  -d '{"event":"sms","text":"Hello"}'
+  -d '{"event":"test","message":"hello"}'
 ```
 
-### Signature checks
-
-| Type | Default header | What is checked |
-|---|---|---|
-| `vonage` | `authorization` | `Bearer <JWT>` signed HS256 with the signature secret; `payload_hash` must equal sha256 of the raw body |
-| `stripe` | `stripe-signature` | `v1` = HMAC-SHA256 of `<t>.<raw body>`; timestamp within 5 min |
-| `github` | `x-hub-signature-256` | `sha256=` + HMAC-SHA256 hex of the raw body |
-| `hmac-sha256` | `x-signature` | HMAC-SHA256 of the raw body, hex or base64, optional `sha256=` prefix |
-
-The header name can be changed per channel.
+The request shows up in the dashboard immediately.
 
 ---
 
-## Dashboard API
+## How to use
 
-No login. Routes for a password-protected channel need its `channel-token` header, otherwise they return `403 { locked: true }`.
+### 1. Pick or create a channel
 
-### Channels
+Two channels always exist:
 
-| Method | Path | Body | Notes |
+| Channel | URL | Auth |
+|---|---|---|
+| `open` | `/hook/open` | None, accepts everything |
+| `secure` | `/hook/secure` | Requires `auth-key: <AUTH_KEY>` header. If `AUTH_KEY` is not set, every request is rejected |
+
+Create your own channels from the dashboard or the [API](#channels-api). Each gets its own URL, for example `/hook/stripe-prod`.
+
+### 2. Point your service at it
+
+Use the channel URL as the webhook / callback URL in your provider's settings:
+
+```
+https://<your-host>/hook/<channel-id>
+```
+
+For local development, expose the server with a tunnel such as ngrok:
+
+```bash
+ngrok http 3000
+```
+
+Then use `https://<ngrok-id>.ngrok.io/hook/<channel-id>` and set `TRUST_PROXY=true` so the real sender IP is logged.
+
+### 3. Send requests and inspect them
+
+Every request to the channel is logged with:
+
+- method, full URL and query parameters
+- all headers (secrets masked as `***`)
+- parsed body and raw body (base64 for binary)
+- the response that was sent back, status code and duration
+- sender IP, body size and signature result
+
+### 4. Control what the sender gets back
+
+In a channel's settings, set:
+
+| Setting | Example | Use it to |
+|---|---|---|
+| Status | `500` | Test how the sender handles errors |
+| Delay | `5000` ms | Test timeouts and retries |
+| Headers | `x-request-id: 123` | Return headers the sender expects |
+| Body | `{"ok":true}` or an NCCO for Vonage | Return the payload the sender expects |
+
+The default reply is `200 {"status":"OK"}`.
+
+### 5. Verify signatures
+
+Choose a signature type and paste the signing secret in the channel settings:
+
+| Type | Header checked (default) | What is verified |
+|---|---|---|
+| Vonage | `authorization` | `Bearer <JWT>` signed HS256 with your signature secret; `payload_hash` matches the body |
+| Stripe | `stripe-signature` | `v1` HMAC-SHA256 of `<timestamp>.<body>`, timestamp within 5 minutes |
+| GitHub | `x-hub-signature-256` | `sha256=` HMAC-SHA256 of the body |
+| HMAC SHA-256 | `x-signature` | HMAC-SHA256 of the body, hex or base64, optional `sha256=` prefix |
+
+The header name can be changed per channel. Requests with a bad signature are still accepted and logged, just marked invalid, so you can see what went wrong.
+
+### 6. Keep a channel private
+
+Set a password on a channel. Without it, others can see the channel exists but not its logs, and cannot change or delete it. Senders never need the password (use `auth-key` to restrict who can send).
+
+Passwords are hashed with scrypt. 10 wrong attempts from one IP block unlocking for 10 minutes.
+
+---
+
+## Example: Vonage
+
+1. Run the server and expose it with ngrok.
+2. Create a channel called `vonage`.
+3. In your Vonage application, set the event URL to `https://<ngrok-id>.ngrok.io/hook/vonage/event` and the answer URL to `.../hook/vonage/answer`.
+4. To check signed webhooks, set the channel's signature type to **Vonage** and paste your account's signature secret.
+5. To answer calls, set the channel's response body to your NCCO JSON.
+
+---
+
+## Configuration
+
+All settings are optional environment variables (put them in `.env`):
+
+| Variable | Description | Default |
+|---|---|---|
+| `AUTH_KEY` | Key required in the `auth-key` header for `/hook/secure` | not set (rejects all) |
+| `PORT` | Port for the HTTP and WebSocket server | `3000` |
+| `MAX_LOGS` | Logs kept per channel; oldest unstarred logs are dropped first | `500` |
+| `MAX_CHANNELS` | Maximum number of channels | `50` |
+| `BODY_LIMIT` | Maximum request body size | `10mb` |
+| `TRUST_PROXY` | Express `trust proxy` setting (`true`, a hop count or a subnet) to log the real client IP behind a proxy | not set |
+
+---
+
+## API
+
+Everything the dashboard does is available over HTTP. Routes for a password-protected channel need a `channel-token` header (from the unlock endpoint), otherwise they return `403`.
+
+### Webhook endpoint
+
+| Method | Path | Description |
+|---|---|---|
+| any | `/hook/:channel` | Capture a request and reply with the channel's configured response |
+| any | `/hook/:channel/*` | Same, for any sub-path |
+
+Returns `404` for an unknown channel and `401` when the channel requires an `auth-key` and it is missing or wrong.
+
+### Channels API
+
+| Method | Path | Body | Description |
 |---|---|---|---|
-| `GET` | `/api/channels` | | Public list. Secrets are never returned, only `hasAuthKey` / `hasSecret` / `locked` |
-| `POST` | `/api/channels` | channel config | `id` optional (random if empty). Returns a `token` if a password was set |
-| `POST` | `/api/channels/:id/unlock` | `{ "password": "..." }` | Returns `{ token }`. `429` after 10 wrong tries |
-| `PATCH` | `/api/channels/:id` | partial config | Needs token if protected. Omitted fields stay unchanged. Built-in channels can't be changed |
-| `DELETE` | `/api/channels/:id` | | Needs token if protected. Built-in channels can't be deleted |
+| `GET` | `/api/channels` | | List channels (secrets are never returned) |
+| `POST` | `/api/channels` | channel config | Create a channel. `id` is optional (random if empty) |
+| `PATCH` | `/api/channels/:id` | partial config | Update a channel. Omitted fields stay unchanged |
+| `DELETE` | `/api/channels/:id` | | Delete a channel and its logs |
+| `POST` | `/api/channels/:id/unlock` | `{ "password": "..." }` | Get a `token` for a password-protected channel |
+
+The built-in `open` and `secure` channels cannot be changed or deleted.
 
 Channel config:
 
@@ -169,115 +192,112 @@ Channel config:
 {
   "id": "my-service",
   "name": "My service",
-  "viewPassword": "at least 4 chars",
-  "authKey": "secret",
-  "response": { "status": 200, "headers": { "x-foo": "bar" }, "body": "{\"ok\":true}", "delayMs": 0 },
+  "viewPassword": "at least 4 characters",
+  "authKey": "sender-secret",
+  "response": {
+    "status": 200,
+    "headers": { "x-foo": "bar" },
+    "body": "{\"ok\":true}",
+    "delayMs": 0
+  },
   "signature": { "type": "stripe", "header": "", "secret": "whsec_..." }
 }
 ```
 
-`viewPassword: ""` removes the password. `authKey: ""` turns auth off. `signature.secret` omitted keeps the current secret.
+- `viewPassword: ""` removes the password, `authKey: ""` turns sender auth off.
+- `signature.type` is one of `none`, `vonage`, `stripe`, `github`, `hmac-sha256`. Omit `signature.secret` to keep the current one.
 
-### Logs
+Example:
 
-| Method | Path | Body | Notes |
+```bash
+curl -X POST http://localhost:3000/api/channels \
+  -H "Content-Type: application/json" \
+  -d '{"name":"Stripe","id":"stripe","signature":{"type":"stripe","secret":"whsec_..."}}'
+```
+
+### Logs API
+
+| Method | Path | Body | Description |
 |---|---|---|---|
-| `GET` | `/logs/:channel` | | Newest first |
-| `DELETE` | `/logs/:channel` | | Clears unstarred logs |
-| `DELETE` | `/logs/:channel/:id` | | Deletes one log |
-| `PATCH` | `/logs/:channel/:id` | `{ "pinned": true }` | Star / unstar |
-| `POST` | `/logs/:channel/import` | `{ "logs": [...] }` | Max 500 per call; entries are sanitized and marked `imported` |
+| `GET` | `/logs/:channel` | | All logs of a channel, newest first |
+| `DELETE` | `/logs/:channel` | | Delete all logs except starred ones |
+| `DELETE` | `/logs/:channel/:id` | | Delete one log |
+| `PATCH` | `/logs/:channel/:id` | `{ "pinned": true }` | Star or unstar a log |
+| `POST` | `/logs/:channel/import` | `{ "logs": [...] }` | Import up to 500 logs (from a JSON export or HAR entries) |
 
-### Log object
+A log looks like this:
 
-```js
+```json
 {
-  id, channel, method, url, ip,
-  headers,          // sensitive ones masked
-  query,
-  contentType,
-  body,             // parsed JSON / form object, text, or null
-  rawBody,          // exactly as received (base64 if binary)
-  rawEncoding,      // 'utf8' | 'base64'
-  size,             // bytes
-  response, responseHeaders, status,
-  time, duration, aborted,
-  signature,        // null or { type, header, valid, reason }
-  pinned
+  "id": 42,
+  "channel": "stripe",
+  "method": "POST",
+  "url": "/hook/stripe?source=test",
+  "ip": "203.0.113.7",
+  "headers": { "content-type": "application/json", "stripe-signature": "t=...,v1=..." },
+  "query": { "source": "test" },
+  "contentType": "application/json",
+  "body": { "type": "payment_intent.succeeded" },
+  "rawBody": "{\"type\":\"payment_intent.succeeded\"}",
+  "rawEncoding": "utf8",
+  "size": 36,
+  "status": 200,
+  "response": "{\"status\":\"OK\"}",
+  "responseHeaders": { "content-type": "application/json; charset=utf-8" },
+  "time": "2026-10-16T10:42:03.120Z",
+  "duration": 3,
+  "aborted": false,
+  "signature": { "type": "stripe", "header": "stripe-signature", "valid": true, "reason": "Valid Stripe signature" },
+  "pinned": false
 }
 ```
 
----
+### WebSocket
 
-## WebSocket Protocol
+Connect to `ws://<host>:<port>/` to receive live events. To receive events for password-protected channels, send:
 
-Connect to the same host/port (`ws://localhost:3000/`). To receive protected channels, send `{ "type": "AUTH", "tokens": { "<channelId>": "<token>" } }` after connecting (and again whenever tokens change). Channel-scoped messages for a protected channel only go to clients holding its token. Messages:
+```json
+{ "type": "AUTH", "tokens": { "<channel-id>": "<token>" } }
+```
 
-| `type` | Payload |
+| Event | Payload |
 |---|---|
-| `NEW_LOG` | `channel`, `data` (log), `dropped` (ids removed by the cap) |
-| `UPDATE_LOG` | `channel`, `data` (log) |
+| `NEW_LOG` | `channel`, `data` (the log), `dropped` (ids removed by the log limit) |
+| `UPDATE_LOG` | `channel`, `data` |
 | `DELETE_LOG` | `channel`, `id` |
-| `CLEAR_LOGS` | `channel` (starred logs remain) |
-| `RELOAD_CHANNEL` | `channel` (refetch after an import) |
-| `CHANNEL_UPSERT` | `data` (public channel) |
+| `CLEAR_LOGS` | `channel` |
+| `RELOAD_CHANNEL` | `channel` (after an import) |
+| `CHANNEL_UPSERT` | `data` (channel) |
 | `CHANNEL_DELETE` | `id` |
 
-After a reconnect the dashboard refetches everything, so missed events are not lost.
-
 ---
 
-## Keyboard Shortcuts
+## Security notes
 
-| Key | Action |
-|---|---|
-| `j` / `k` | Next / previous log |
-| `o` or `Enter` | Expand / collapse |
-| `c` | Copy as cURL |
-| `s` | Star / unstar |
-| `x` | Select for compare |
-| `/` | Search |
-| `p` | Pause / resume this channel |
-| `[` / `]` | Previous / next channel |
-| `n` / `m` | Notification / sound for this channel |
-| `t` | Toggle theme |
-| `?` | Help |
-| `Esc` | Close dialog / clear selection |
-
----
-
-## Using with Vonage
-
-1. Expose the server publicly, e.g. `ngrok http 3000` (and set `TRUST_PROXY=true` to log real IPs).
-2. Create a channel (e.g. `vonage`) and point your Vonage application's answer/event URLs at `https://<ngrok-id>.ngrok.io/hook/vonage/answer` and `.../hook/vonage/event`.
-3. For signed webhooks, set the channel's signature type to **Vonage (JWT)** and paste your account's signature secret.
-4. Use the custom response to return NCCO JSON for answer URLs, or a delay / 5xx to test Vonage retries.
-
----
-
-## Where Data Lives
-
-| Data | Stored in | Shared? |
-|---|---|---|
-| Channels (config, auth keys, signing secrets, password hashes) | Server memory (`channels` Map in `index.js`) | Channel list is visible to everyone |
-| Captured logs | Server memory, inside each channel | Everyone, unless the channel has a password |
-| Theme, channel access tokens, alert prefs | Browser `localStorage` | Per browser |
-
-Restarting the server wipes channels and logs. Secrets never leave the server: the dashboard only sees `hasAuthKey` / `hasSecret`.
+- Sensitive request headers (`auth-key`, `authorization`, `cookie`, `channel-token`) are masked as `***` in stored logs. Signatures are verified before masking.
+- Auth keys, passwords and signing secrets stay on the server; the API only reports whether they are set.
+- Channels **without** a password can be viewed, changed and deleted by anyone who can reach the server. Protect any channel that matters, and run behind HTTPS when the server is exposed to the internet.
+- There is no rate limiting on webhook endpoints.
 
 ---
 
 ## Limitations
 
-| Limitation | Detail |
-|---|---|
-| No persistence | Logs and custom channels live in memory; wiped on restart |
-| Single process | No support for multiple instances sharing logs |
-| No HTTPS | Wrap with a proxy / ngrok when exposed |
-| No rate limiting | No throttle on `/hook/*` |
+- **No persistence**: channels and logs are kept in memory and are lost when the server restarts.
+- **Single instance**: run one long-lived process (a VPS, Render, Railway, Fly.io...). Serverless platforms and multiple load-balanced instances will not share data.
 
 ---
 
-## Credits
+## Tech stack
 
-© 2026 Webhook Inspector · Built by **Rishabh @ Runo**
+Node.js · Express 5 · ws (WebSocket) · plain HTML, CSS and JavaScript (no build step)
+
+---
+
+## License
+
+ISC
+
+---
+
+Built by [Rishabh](https://in.linkedin.com/in/rishabh-builds) @ [runo.ai](https://in.linkedin.com/company/runo-ai)
