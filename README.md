@@ -18,7 +18,8 @@ Built with Node.js, Express and WebSockets. No database: everything lives in mem
 - **Channel passwords**: protect a channel so only people with the password can view its logs or change its settings.
 - **Live updates**: new logs are pushed to every open dashboard over WebSocket.
 - **Search and filter**: by text, method, status class and time range; star important logs.
-- **Replay and share**: copy any request as a cURL command, export logs as JSON or HAR, import them elsewhere, compare two requests side by side.
+- **Replay and share**: copy any request as a cURL command, resend a stored request to its channel, export logs as JSON or HAR, import them elsewhere, compare two requests side by side.
+- **Instant test**: send a sample webhook (`{"event": "user.signup", "status": "success"}`) to an empty channel with one click.
 - **Alerts**: optional desktop notification or sound per channel.
 - **Safe by default**: sensitive headers are masked in logs, secrets are never sent to the browser, CORS is limited to webhook endpoints.
 
