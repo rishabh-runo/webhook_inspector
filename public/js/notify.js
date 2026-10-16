@@ -1,6 +1,6 @@
 /* Per-channel alert prefs, stored in this browser only: { [channelId]: { notify, sound } } */
 const KEY = 'channelAlerts';
-const baseTitle = document.title;
+let baseTitle = document.title;
 
 let prefs = load();
 let audioCtx = null;
@@ -24,6 +24,16 @@ function set(channelId, key, value) {
     if (!next.notify && !next.sound) delete prefs[channelId];
     else prefs[channelId] = next;
     save();
+}
+
+const showTitle = () => {
+    document.title = unread ? `(${unread}) ${baseTitle}` : baseTitle;
+};
+
+/* Page title for the open channel; keeps the unread count in front while the tab is hidden */
+export function setBaseTitle(title) {
+    baseTitle = title;
+    showTitle();
 }
 
 export function getAlerts(channelId) {
@@ -88,7 +98,7 @@ function beep() {
 export function onNewLog(log, channel, isViewing, onOpen) {
     if (document.hidden) {
         unread++;
-        document.title = `(${unread}) ${baseTitle}`;
+        showTitle();
     }
     if (isViewing && !document.hidden) return;
 
@@ -113,6 +123,6 @@ export function onNewLog(log, channel, isViewing, onOpen) {
 document.addEventListener('visibilitychange', () => {
     if (!document.hidden) {
         unread = 0;
-        document.title = baseTitle;
+        showTitle();
     }
 });
