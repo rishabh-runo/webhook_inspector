@@ -1,511 +1,212 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 
 <head>
+    <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Webhook Inspector</title>
 
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
-
-    <style>
-        :root {
-            --bg: #020617;
-            --panel: #0f172a;
-            --border: #1e293b;
-            --cyan: #22d3ee;
-            --green: #22c55e;
-            --red: #ef4444;
-            --text: #e2e8f0;
-            --muted: #94a3b8;
-        }
-
-        body {
-            margin: 0;
-            font-family: 'Inter', sans-serif;
-            background: radial-gradient(circle at top, #020617, #000);
-            color: var(--text);
-        }
-
-        .header {
-            display: flex;
-            justify-content: space-between;
-            padding: 16px 20px;
-            border-bottom: 1px solid var(--border);
-            background: rgba(2, 6, 23, 0.8);
-            backdrop-filter: blur(8px);
-        }
-
-        .title {
-            color: var(--cyan);
-            font-weight: 600;
-        }
-
-        .actions {
-            display: flex;
-            gap: 12px;
-            align-items: center;
-        }
-
-        .count {
-            font-size: 13px;
-            font-weight: 600;
-            color: var(--cyan);
-            text-shadow: 0 0 8px rgba(34, 211, 238, 0.6);
-        }
-
-        button {
-            background: var(--cyan);
-            border: none;
-            padding: 6px 12px;
-            border-radius: 6px;
-            color: black;
-            font-weight: 500;
-            cursor: pointer;
-        }
-
-        /* ----------- TABS ----------- */
-        .tabs {
-            display: flex;
-            gap: 0;
-            padding: 0 20px;
-            border-bottom: 1px solid var(--border);
-            background: rgba(15, 23, 42, 0.6);
-            backdrop-filter: blur(8px);
-        }
-
-        .tab {
-            background: transparent;
-            border: none;
-            border-bottom: 2px solid transparent;
-            padding: 10px 16px;
-            color: var(--muted);
-            font-size: 13px;
-            font-weight: 500;
-            cursor: pointer;
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            border-radius: 0;
-            margin-bottom: -1px;
-            transition: color 0.15s;
-        }
-
-        .tab:hover {
-            color: var(--text);
-        }
-
-        .tab.active {
-            color: var(--cyan);
-            border-bottom-color: var(--cyan);
-        }
-
-        .tab .path {
-            font-size: 11px;
-            font-family: monospace;
-            opacity: 0.55;
-        }
-
-        .tab.active .path {
-            opacity: 0.8;
-        }
-
-        .badge {
-            font-size: 10px;
-            font-weight: 600;
-            padding: 1px 7px;
-            border-radius: 10px;
-            background: rgba(148, 163, 184, 0.12);
-            color: var(--muted);
-            min-width: 16px;
-            text-align: center;
-        }
-
-        .tab.active .badge {
-            background: var(--cyan);
-            color: #000;
-        }
-
-        /* ----------- LOGS ----------- */
-        #logs {
-            padding: 16px;
-            max-width: 1100px;
-            margin: auto;
-        }
-
-        .log {
-            border-radius: 12px;
-            margin-bottom: 14px;
-            overflow: hidden;
-            border: 1px solid var(--border);
-            background: linear-gradient(145deg, #0f172a, #020617);
-            position: relative;
-        }
-
-        .log::before {
-            content: '';
-            position: absolute;
-            inset: 0;
-            border-radius: 12px;
-            pointer-events: none;
-            opacity: 0.25;
-        }
-
-        .log.get::before {
-            box-shadow: 0 0 20px rgba(34, 197, 94, 0.25);
-        }
-
-        .log.post::before {
-            box-shadow: 0 0 20px rgba(59, 130, 246, 0.25);
-        }
-
-        .log.get {
-            border-left: 4px solid #22c55e;
-        }
-
-        .log.post {
-            border-left: 4px solid #3b82f6;
-        }
-
-        .log.error {
-            box-shadow: 0 0 10px rgba(239, 68, 68, 0.4);
-        }
-
-        .log-header {
-            padding: 14px;
-            display: flex;
-            justify-content: space-between;
-            cursor: pointer;
-        }
-
-        .left {
-            display: flex;
-            gap: 10px;
-            align-items: center;
-        }
-
-        .arrow {
-            font-size: 13px;
-            color: var(--muted);
-        }
-
-        .right {
-            display: flex;
-            align-items: center;
-            gap: 14px;
-        }
-
-        .method {
-            font-size: 11px;
-            padding: 3px 8px;
-            border-radius: 6px;
-            font-weight: 600;
-            background: rgba(148, 163, 184, 0.15);
-            color: var(--muted);
-        }
-
-        .log {
-            border-left: 4px solid var(--muted);
-        }
-
-        .method.GET {
-            background: rgba(34, 197, 94, 0.15);
-            color: #22c55e;
-        }
-
-        .method.POST {
-            background: rgba(59, 130, 246, 0.15);
-            color: #3b82f6;
-        }
-
-        .url {
-            font-size: 13px;
-        }
-
-        .status {
-            font-weight: 700;
-            margin-left: 6px;
-        }
-
-        .status.success {
-            color: #22c55e;
-        }
-
-        .status.error {
-            color: #ef4444;
-        }
-
-        .log-body {
-            display: none;
-            border-top: 1px solid var(--border);
-        }
-
-        .section {
-            border-top: 1px solid var(--border);
-        }
-
-        .section-header {
-            padding: 10px 14px;
-            cursor: pointer;
-            color: var(--cyan);
-        }
-
-        .section-body {
-            padding: 10px 14px;
-        }
-
-        pre {
-            margin: 0;
-            font-size: 12px;
-            overflow-x: auto;
-        }
-
-        .delete {
-            cursor: pointer;
-            font-size: 16px;
-            color: #ef4444;
-            padding: 6px;
-            border-radius: 6px;
-            background: rgba(239, 68, 68, 0.1);
-            transition: 0.2s;
-        }
-
-        .delete:hover {
-            background: rgba(239, 68, 68, 0.2);
-            transform: scale(1.15);
-            box-shadow: 0 0 8px rgba(239, 68, 68, 0.6);
-        }
-
-        .empty {
-            text-align: center;
-            color: var(--muted);
-            padding: 60px 0;
-            font-size: 14px;
-        }
-
-        .empty .endpoint {
-            margin-top: 8px;
-            font-family: monospace;
-            font-size: 13px;
-            color: var(--cyan);
-            opacity: 0.7;
-        }
-    </style>
+    <link rel="stylesheet" href="css/app.css">
+    <script>
+        try {
+            const t = localStorage.getItem('theme');
+            if (t) document.documentElement.dataset.theme = t;
+        } catch { }
+    </script>
+    <script type="module" src="js/main.js"></script>
 </head>
 
 <body>
 
-    <div class="header">
+    <header class="header">
         <div class="title">⚡ WEBHOOK INSPECTOR</div>
         <div class="actions">
-            <div class="count" id="count">0 logs</div>
-            <button onclick="clearLogs()">Clear</button>
+            <span class="conn connecting" id="conn"><span class="dot"></span><span class="conn-label">Connecting</span></span>
+            <span class="count" id="count">0 logs</span>
+            <button class="btn ghost icon" id="btn-theme" title="Toggle theme (t)">◐</button>
+            <button class="btn ghost icon" id="btn-help" title="Keyboard shortcuts (?)">?</button>
         </div>
+    </header>
+
+    <nav class="tabs" id="tabs" role="tablist" aria-label="Channels"></nav>
+
+    <div class="toolbar-band">
+    <section class="toolbar">
+        <div class="endpoint-bar">
+            <code class="endpoint" id="endpoint-url"></code>
+            <button class="btn ghost sm" id="btn-copy-endpoint">⧉ Copy URL</button>
+            <span class="chips" id="channel-chips"></span>
+            <div class="spacer"></div>
+            <button class="btn ghost sm" id="btn-pause" title="Pause this channel's live feed (p)">⏸ Pause</button>
+            <button class="btn ghost sm" id="btn-ch-notify" title="Desktop notification for new requests on this channel">🔕 Notify</button>
+            <button class="btn ghost sm" id="btn-ch-sound" title="Play a sound for new requests on this channel">🔇 Sound</button>
+            <button class="btn ghost sm" id="btn-lock" title="Forget the password on this browser" hidden>🔒 Lock</button>
+            <button class="btn ghost sm" id="btn-channel-settings">⚙ Settings</button>
+        </div>
+        <div class="filters">
+            <input id="f-text" type="search" placeholder="Search url, headers, body…  ( / )" autocomplete="off">
+            <select id="f-method" aria-label="Method">
+                <option value="">All methods</option>
+                <option>GET</option>
+                <option>POST</option>
+                <option>PUT</option>
+                <option>PATCH</option>
+                <option>DELETE</option>
+                <option value="OTHER">Other</option>
+            </select>
+            <select id="f-status" aria-label="Status">
+                <option value="">All statuses</option>
+                <option value="2">2xx</option>
+                <option value="3">3xx</option>
+                <option value="4">4xx</option>
+                <option value="5">5xx</option>
+            </select>
+            <select id="f-range" aria-label="Time range">
+                <option value="">Any time</option>
+                <option value="5">Last 5 min</option>
+                <option value="15">Last 15 min</option>
+                <option value="60">Last hour</option>
+                <option value="1440">Last 24 h</option>
+            </select>
+            <label class="check"><input type="checkbox" id="f-starred"> ★ Starred</label>
+            <div class="spacer"></div>
+            <button class="btn ghost sm" id="btn-compare" disabled title="Tick two logs to compare (x)">Compare 0/2</button>
+            <details class="menu">
+                <summary class="btn ghost sm">Export ▾</summary>
+                <div class="menu-list">
+                    <button data-export="json">JSON</button>
+                    <button data-export="har">HAR</button>
+                </div>
+            </details>
+            <button class="btn ghost sm" id="btn-import">Import</button>
+            <input type="file" id="import-file" accept=".json,.har,application/json" hidden>
+            <button class="btn danger sm" id="btn-clear" title="Clear unstarred logs">Clear</button>
+        </div>
+    </section>
     </div>
 
-    <div class="tabs">
-        <button class="tab active" id="tab-open" onclick="switchChannel('open')">
-            open
-            <span class="path">/hook/open</span>
-            <span class="badge" id="badge-open">0</span>
-        </button>
-        <button class="tab" id="tab-secure" onclick="switchChannel('secure')">
-            secure
-            <span class="path">/hook/secure</span>
-            <span class="badge" id="badge-secure">0</span>
-        </button>
+    <div class="banner" id="paused-banner" hidden>
+        <span id="paused-text">Paused</span>
+        <button class="btn sm" id="btn-resume">▶ Resume</button>
     </div>
 
-    <div id="logs"></div>
+    <main id="logs"></main>
 
-    <script>
-        const store = { open: [], secure: [] };
-        let activeChannel = 'open';
+    <footer class="footer">
+        © <span id="year">2026</span> Webhook Inspector · Built by <strong>Rishabh @ Runo</strong>
+    </footer>
 
-        const logsDiv = document.getElementById('logs');
-        const countEl = document.getElementById('count');
+    <dialog id="modal-channel" class="modal">
+        <form id="channel-form" method="dialog">
+            <h2 id="channel-title">New channel</h2>
 
-        /* Channel switcher */
-        function switchChannel(ch) {
-            activeChannel = ch;
-            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
-            document.getElementById(`tab-${ch}`).classList.add('active');
-            refresh();
-        }
+            <div class="grid2">
+                <label>Name
+                    <input name="name" maxlength="40" required>
+                </label>
+                <label>ID <span class="hint" id="id-hint">optional, random if empty</span>
+                    <input name="id" maxlength="40" pattern="[a-z0-9][a-z0-9\-]{0,39}" placeholder="my-service">
+                </label>
+            </div>
 
-        function updateTabCounts() {
-            document.getElementById('badge-open').innerText = store.open.length;
-            document.getElementById('badge-secure').innerText = store.secure.length;
-        }
+            <fieldset>
+                <legend>Password (who can view)</legend>
+                <label class="check"><input type="checkbox" name="protect"> Password-protect this channel's logs</label>
+                <label>Password <span class="hint">4-200 chars · others must enter it to see logs or change settings</span>
+                    <input name="viewPassword" type="password" autocomplete="new-password" minlength="4" maxlength="200">
+                </label>
+            </fieldset>
 
-        /* Toggle log expand */
-        function toggle(el) {
-            const body = el.nextElementSibling;
-            const arrow = el.querySelector('.arrow');
-            const open = body.style.display === 'block';
-            body.style.display = open ? 'none' : 'block';
-            arrow.innerText = open ? '⯈' : '⯆';
-        }
+            <fieldset>
+                <legend>Auth (who can send)</legend>
+                <label class="check"><input type="checkbox" name="requireAuth"> Require <code>auth-key</code> header</label>
+                <label>Auth key
+                    <input name="authKey" type="password" autocomplete="new-password" maxlength="200">
+                </label>
+            </fieldset>
 
-        /* Section toggle */
-        function toggleSection(el) {
-            const body = el.nextElementSibling;
-            body.style.display = body.style.display === 'none' ? 'block' : 'none';
-            el.innerText = el.innerText.startsWith('⯈')
-                ? el.innerText.replace('⯈', '⯆')
-                : el.innerText.replace('⯆', '⯈');
-        }
+            <fieldset>
+                <legend>Response</legend>
+                <div class="grid2">
+                    <label>Status
+                        <input name="status" type="number" min="100" max="599" value="200">
+                    </label>
+                    <label>Delay (ms) <span class="hint">0-30000</span>
+                        <input name="delayMs" type="number" min="0" max="30000" value="0">
+                    </label>
+                </div>
+                <label>Headers <span class="hint">one per line: Name: value</span>
+                    <textarea name="headers" rows="2" class="mono" placeholder="x-custom: value"></textarea>
+                </label>
+                <label>Body
+                    <textarea name="body" rows="3" class="mono"></textarea>
+                </label>
+            </fieldset>
 
-        function safeParse(data) {
-            try {
-                if (typeof data === 'string') return JSON.parse(data);
-                return data;
-            } catch {
-                return data;
-            }
-        }
+            <fieldset>
+                <legend>Signature check</legend>
+                <div class="grid2">
+                    <label>Type
+                        <select name="sigType">
+                            <option value="none">None</option>
+                            <option value="vonage">Vonage (JWT)</option>
+                            <option value="stripe">Stripe</option>
+                            <option value="github">GitHub</option>
+                            <option value="hmac-sha256">Generic HMAC SHA-256</option>
+                        </select>
+                    </label>
+                    <label>Header
+                        <input name="sigHeader" maxlength="100">
+                    </label>
+                </div>
+                <label>Secret
+                    <input name="sigSecret" type="password" autocomplete="new-password" maxlength="500">
+                </label>
+            </fieldset>
 
-        function esc(value) {
-            return String(value ?? '')
-                .replace(/&/g, '&amp;')
-                .replace(/</g, '&lt;')
-                .replace(/>/g, '&gt;')
-                .replace(/"/g, '&quot;')
-                .replace(/'/g, '&#39;');
-        }
+            <p class="form-error" id="channel-error" hidden></p>
 
-        function section(title, data) {
-            return `
-    <div class="section">
-      <div class="section-header" onclick="toggleSection(this)">⯈ ${title}</div>
-      <div class="section-body" style="display:none">
-        <pre>${esc(JSON.stringify(data, null, 2))}</pre>
-      </div>
-    </div>`;
-        }
+            <div class="modal-actions">
+                <button type="button" class="btn danger" id="btn-delete-channel" hidden>Delete channel</button>
+                <div class="spacer"></div>
+                <button type="button" class="btn ghost" data-close>Cancel</button>
+                <button type="submit" class="btn" value="save">Save</button>
+            </div>
+        </form>
+    </dialog>
 
-        function renderLog(log) {
-            const el = document.createElement('div');
-            const status = Number(log.status);
-            const isError = status >= 400;
-            const method = String(log.method).replace(/[^A-Za-z]/g, '');
-            el.className = `log ${method.toLowerCase()}${isError ? ' error' : ''}`;
+    <dialog id="modal-diff" class="modal wide">
+        <div class="modal-head">
+            <h2>Compare requests</h2>
+            <label class="check"><input type="checkbox" id="diff-only-changes"> Only changes</label>
+            <button class="btn ghost sm" data-close>Close</button>
+        </div>
+        <div id="diff-body"></div>
+    </dialog>
 
-            el.innerHTML = `
-    <div class="log-header" onclick="toggle(this)">
-      <div class="left">
-        <div class="arrow">⯈</div>
-        <div class="method ${method}">${method}</div>
-        <div class="url">${esc(log.url)}</div>
-        <div class="status ${isError ? 'error' : 'success'}">${status}</div>
-      </div>
-      <div class="right">
-        <div>${esc(new Date(log.time).toLocaleTimeString())}</div>
-        <div class="delete" onclick="deleteLog(event, ${Number(log.id)})">🗑</div>
-      </div>
-    </div>
-    <div class="log-body">
-      ${section('Headers', log.headers)}
-      ${section('Query', log.query)}
-      ${section('Body', log.body)}
-      ${section('Response', safeParse(log.response))}
-    </div>`;
+    <dialog id="modal-help" class="modal">
+        <div class="modal-head">
+            <h2>Keyboard shortcuts</h2>
+            <button class="btn ghost sm" data-close>Close</button>
+        </div>
+        <table class="keys">
+            <tr><td><kbd>j</kbd> / <kbd>k</kbd></td><td>Next / previous log</td></tr>
+            <tr><td><kbd>o</kbd> or <kbd>Enter</kbd></td><td>Expand / collapse log</td></tr>
+            <tr><td><kbd>c</kbd></td><td>Copy as cURL</td></tr>
+            <tr><td><kbd>s</kbd></td><td>Star / unstar</td></tr>
+            <tr><td><kbd>x</kbd></td><td>Select for compare</td></tr>
+            <tr><td><kbd>/</kbd></td><td>Search</td></tr>
+            <tr><td><kbd>p</kbd></td><td>Pause / resume this channel</td></tr>
+            <tr><td><kbd>[</kbd> / <kbd>]</kbd></td><td>Previous / next channel</td></tr>
+            <tr><td><kbd>n</kbd> / <kbd>m</kbd></td><td>Notification / sound for this channel</td></tr>
+            <tr><td><kbd>t</kbd></td><td>Toggle theme</td></tr>
+            <tr><td><kbd>?</kbd></td><td>This help</td></tr>
+            <tr><td><kbd>Esc</kbd></td><td>Close / clear selection</td></tr>
+        </table>
+    </dialog>
 
-            return el;
-        }
-
-        function refresh() {
-            const logs = store[activeChannel];
-            logsDiv.innerHTML = '';
-
-            if (logs.length === 0) {
-                const endpointMap = { open: '/hook/open', secure: '/hook/secure' };
-                logsDiv.innerHTML = `
-          <div class="empty">
-            No requests captured yet.
-            <div class="endpoint">POST ${endpointMap[activeChannel]}</div>
-          </div>`;
-            } else {
-                logs.forEach(l => logsDiv.appendChild(renderLog(l)));
-            }
-
-            countEl.innerText = logs.length + ' logs';
-            updateTabCounts();
-        }
-
-        /* Viewer key (only needed when the server sets VIEWER_KEY) */
-        function getViewerKey() {
-            try { return localStorage.getItem('viewerKey') || ''; } catch { return ''; }
-        }
-
-        function askViewerKey() {
-            const key = prompt('Viewer key required');
-            if (key === null) return;
-            try { localStorage.setItem('viewerKey', key); } catch { }
-            location.reload();
-        }
-
-        function api(url, options = {}) {
-            return fetch(url, {
-                ...options,
-                headers: { ...(options.headers || {}), 'viewer-key': getViewerKey() }
-            }).then(r => {
-                if (r.status === 401) {
-                    askViewerKey();
-                    throw new Error('Unauthorized');
-                }
-                return r;
-            });
-        }
-
-        function deleteLog(e, id) {
-            e.stopPropagation();
-            api(`/logs/${activeChannel}/${id}`, { method: 'DELETE' }).catch(() => { });
-        }
-
-        function clearLogs() {
-            api(`/logs/${activeChannel}`, { method: 'DELETE' }).catch(() => { });
-        }
-
-        /* Init — fetch both channels (server sends newest first) */
-        Promise.all([
-            api('/logs/open').then(r => r.json()),
-            api('/logs/secure').then(r => r.json())
-        ]).then(([open, secure]) => {
-            store.open = open;
-            store.secure = secure;
-            refresh();
-            connectWs();
-        }).catch(() => { });
-
-        /* WebSocket */
-        function connectWs() {
-            const protocol = location.protocol === 'https:' ? 'wss' : 'ws';
-            const ws = new WebSocket(`${protocol}://${location.host}/?key=${encodeURIComponent(getViewerKey())}`);
-            ws.onmessage = onWsMessage;
-        }
-
-        function onWsMessage(e) {
-            const msg = JSON.parse(e.data);
-
-            if (msg.type === 'NEW_LOG') {
-                store[msg.channel].unshift(msg.data);
-                if (msg.channel === activeChannel) refresh();
-                else updateTabCounts();
-            }
-
-            if (msg.type === 'CLEAR_LOGS') {
-                store[msg.channel] = [];
-                if (msg.channel === activeChannel) refresh();
-                else updateTabCounts();
-            }
-
-            if (msg.type === 'DELETE_LOG') {
-                store[msg.channel] = store[msg.channel].filter(l => l.id !== msg.id);
-                if (msg.channel === activeChannel) refresh();
-                else updateTabCounts();
-            }
-        }
-    </script>
+    <div class="toast" id="toast" role="status"></div>
 
 </body>
 

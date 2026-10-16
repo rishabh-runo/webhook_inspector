@@ -1,38 +1,71 @@
-# Vonage Webhook Inspector — Project Documentation
+# Webhook Inspector
 
-## Overview
+A lightweight, real-time webhook inspection tool built with Node.js. It captures incoming HTTP requests (Vonage, Stripe, GitHub, anything), keeps them in memory, and streams them live to a browser dashboard over WebSocket.
 
-A lightweight, real-time webhook inspection tool built with Node.js. It captures incoming HTTP requests (primarily from Vonage SMS/Voice APIs), stores them in memory, and streams them live to a browser-based dashboard via WebSocket.
+Intended for local development and debugging. Logs and custom channels live in memory and are wiped on restart.
 
-Intended for local development and debugging — not production use (no persistence, no horizontal scaling).
+---
+
+## Features
+
+**Capturing**
+- Any HTTP method, any content type: JSON, form, text, XML, binary (stored as base64)
+- Raw body kept exactly as received (needed for signature checks)
+- Sub-paths are captured too: `/hook/<channel>/anything/here`
+- Per-log size, duration, source IP, response headers and body
+
+**Channels**
+- Built-in `open` (no auth) and `secure` (`auth-key` = `AUTH_KEY`). These are fixed: they can't be edited or deleted.
+- Chrome-style tab bar: `+` creates a channel, `×` (or middle-click, or `Delete` on a focused tab) deletes one. You're asked to confirm only if the channel has logs.
+- Create, edit and delete channels from the UI, each with its own:
+  - optional password: only people who enter it can see the channel's logs or change its settings
+  - optional `auth-key`
+  - custom response: status, headers, body, delay (0-30 s)
+  - signature check: Vonage JWT, Stripe, GitHub, or generic HMAC SHA-256
+- Signature results show on each log as `✓ signed` / `✗ signature` (hover for the reason). Requests are never rejected for a bad signature, only labelled.
+
+**Dashboard**
+- Live feed with auto-reconnect and a Live / Reconnecting / Disconnected indicator
+- Pause and resume the live feed per channel (⏸ on the tab); held requests show on resume
+- Search (url, headers, body, response) and filters (method, status, time range, starred)
+- Collapsible, syntax-coloured JSON viewer
+- Copy endpoint URL, any section, or a whole request as cURL
+- Star logs: starred logs survive Clear and the log cap
+- Compare two logs side by side (diff)
+- Export JSON or HAR; import JSON exports or HAR files
+- Light / dark theme (follows system by default), works on phones
+- Per-channel desktop notification and/or sound (off by default). Alerts fire for enabled channels only, and not while you're already looking at that channel. Saved per browser.
+- Keyboard shortcuts (press `?`)
+- Renders 50 cards at a time and loads more on scroll; new logs are inserted without re-rendering the list
 
 ---
 
 ## Project Structure
 
 ```
-vonageWebhook/
-├── index.js           # Express server + WebSocket server (all backend logic)
-├── package.json       # NPM manifest
-├── package-lock.json  # Locked dependency tree
-├── .env               # Environment variables (not committed)
-├── .gitignore
-└── public/
-    └── index.html     # Single-page dashboard (HTML + CSS + JS, no build step)
+webhook_inspector/
+├── index.js              # Express + WebSocket server, routes, channel store
+├── lib/
+│   ├── signature.js      # Vonage / Stripe / GitHub / HMAC verification
+│   └── validate.js       # Channel config validation, import sanitizing, header masking
+├── public/
+│   ├── index.html        # Dashboard markup
+│   ├── css/app.css       # Styles + light/dark theme tokens
+│   └── js/
+│       ├── main.js       # State, list rendering, events, keyboard shortcuts
+│       ├── api.js        # fetch wrapper, channel access tokens, WebSocket URL
+│       ├── ws.js         # WebSocket with backoff reconnect
+│       ├── render.js     # Log card + section rendering
+│       ├── json-view.js  # Collapsible JSON tree
+│       ├── channels.js   # Create / edit channel dialog
+│       ├── diff.js       # Side-by-side diff
+│       ├── export.js     # JSON / HAR export and import parsing
+│       ├── notify.js     # Notifications, sound, unread title count
+│       └── utils.js      # Escaping, formatting, clipboard, cURL builder
+└── package.json
 ```
 
----
-
-## Tech Stack
-
-| Layer | Technology |
-|---|---|
-| Runtime | Node.js (CommonJS) |
-| HTTP Framework | Express 5.x |
-| Real-time | WebSocket (`ws` library) |
-| CORS | `cors` package |
-| Env Config | `dotenv` |
-| Frontend | Vanilla HTML/CSS/JS |
+No build step: the browser loads the JS files as ES modules.
 
 ---
 
@@ -42,17 +75,35 @@ Create a `.env` file in the project root:
 
 ```env
 AUTH_KEY=your_secret_key_here
-VIEWER_KEY=your_viewer_key_here
 ```
 
-| Variable | Used As | Default |
+| Variable | Used as | Default |
 |---|---|---|
 | `AUTH_KEY` | `auth-key` header required by `/hook/secure` (unset = all rejected) | none |
-| `VIEWER_KEY` | Optional. Protects `/logs/*` (`viewer-key` header) and the WebSocket (`?key=`). The dashboard prompts for it. | none (open) |
 | `PORT` | HTTP/WS port | `3000` |
-| `MAX_LOGS` | Max logs kept per channel (oldest dropped) | `500` |
+| `MAX_LOGS` | Max logs kept per channel (oldest unstarred dropped) | `500` |
+| `MAX_CHANNELS` | Max number of channels | `50` |
+| `BODY_LIMIT` | Max request body size | `10mb` |
+| `TRUST_PROXY` | Express `trust proxy` setting, so the logged IP is the real client behind ngrok / a proxy (`true`, a hop count, or a subnet) | unset |
 
-Loaded at startup via `require('dotenv').config()`. Sensitive headers (`auth-key`, `viewer-key`, `authorization`, `cookie`) are masked as `***` in logs.
+Sensitive headers (`auth-key`, `channel-token`, `authorization`, `cookie`) are masked as `***` in logs. Signatures are checked before masking.
+
+---
+
+## Channel Passwords
+
+The dashboard is open to everyone. To keep a channel private, set a password in its **⚙ Settings**.
+
+- Everyone still sees the channel's name and webhook URL in the tab bar.
+- Without the password, the channel shows a lock screen: no logs, no live updates, no settings, no delete.
+- After unlocking, this browser remembers it (🔓 on the tab). **🔒 Lock** forgets it.
+- Changing or removing the password logs everyone else out of that channel.
+- Webhook senders don't need the password (use `auth-key` for that).
+- Built-in `open` and `secure` can't have a password.
+
+How it works: the password is hashed with scrypt (never stored in plain text). Unlocking returns an HMAC access token for that channel, sent as the `channel-token` header and in the WebSocket `AUTH` message. Tokens stop working when the password changes or the server restarts. 10 wrong passwords from one IP lock unlocking for 10 minutes.
+
+> **Security note:** channels without a password can be viewed, edited and deleted by anyone who can reach the server. Protect any channel that matters, and use HTTPS when the server is exposed.
 
 ---
 
@@ -63,270 +114,156 @@ npm install
 npm start
 ```
 
-Server starts on **http://localhost:3000** (or `PORT`).
+Open **http://localhost:3000** (or your `PORT`).
 
 ---
 
-## Architecture
+## Webhook Endpoints
 
+### `ALL /hook/:channel` and `ALL /hook/:channel/*`
+
+| | |
+|---|---|
+| Auth | `auth-key` header, only if the channel requires it |
+| Response | The channel's custom response (default `200 {"status":"OK"}`) |
+| Unknown channel | `404`, not logged |
+| CORS | Enabled (only on `/hook/*`) |
+
+```bash
+curl -X POST http://localhost:3000/hook/secure \
+  -H "auth-key: $AUTH_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"event":"sms","text":"Hello"}'
 ```
-                         ┌─────────────────────────┐
-                         │  External Caller         │
-                         │  (Vonage, curl, etc.)    │
-                         └────────────┬────────────┘
-                                      │
-                         POST /webhook
-                         Header: auth-key: <token>
-                                      │
-                         ┌────────────v────────────┐
-                         │  Logging Middleware      │
-                         │  (intercepts /webhook)   │
-                         └────────────┬────────────┘
-                                      │
-                         ┌────────────v────────────┐
-                         │  authMiddleware          │
-                         │  (validates auth-key)    │
-                         └────────────┬────────────┘
-                                      │
-                         ┌────────────v────────────┐
-                         │  Route Handler           │
-                         │  res.json({status:'OK'}) │
-                         └────────────┬────────────┘
-                                      │
-                              response fires 'finish'
-                                      │
-                         ┌────────────v────────────┐
-                         │  addLog()                │
-                         │  logs.unshift(log)       │
-                         │  broadcast(NEW_LOG)      │
-                         └────────────┬────────────┘
-                                      │
-                         ┌────────────v────────────┐
-                         │  WebSocket Broadcast     │
-                         │  → all connected clients │
-                         └────────────┬────────────┘
-                                      │
-                         ┌────────────v────────────┐
-                         │  Browser Dashboard       │
-                         │  public/index.html       │
-                         │  renders log in real-time│
-                         └─────────────────────────┘
-```
+
+### Signature checks
+
+| Type | Default header | What is checked |
+|---|---|---|
+| `vonage` | `authorization` | `Bearer <JWT>` signed HS256 with the signature secret; `payload_hash` must equal sha256 of the raw body |
+| `stripe` | `stripe-signature` | `v1` = HMAC-SHA256 of `<t>.<raw body>`; timestamp within 5 min |
+| `github` | `x-hub-signature-256` | `sha256=` + HMAC-SHA256 hex of the raw body |
+| `hmac-sha256` | `x-signature` | HMAC-SHA256 of the raw body, hex or base64, optional `sha256=` prefix |
+
+The header name can be changed per channel.
 
 ---
 
-## Backend — `index.js`
+## Dashboard API
 
-### Server Setup (lines 1–19)
+No login. Routes for a password-protected channel need its `channel-token` header, otherwise they return `403 { locked: true }`.
 
-```js
-const app    = express();
-const server = http.createServer(app);
-const wss    = new WebSocket.Server({ server });
-```
+### Channels
 
-Both the Express app and WebSocket server share the same underlying HTTP server so they run on the same port (3000).
+| Method | Path | Body | Notes |
+|---|---|---|---|
+| `GET` | `/api/channels` | | Public list. Secrets are never returned, only `hasAuthKey` / `hasSecret` / `locked` |
+| `POST` | `/api/channels` | channel config | `id` optional (random if empty). Returns a `token` if a password was set |
+| `POST` | `/api/channels/:id/unlock` | `{ "password": "..." }` | Returns `{ token }`. `429` after 10 wrong tries |
+| `PATCH` | `/api/channels/:id` | partial config | Needs token if protected. Omitted fields stay unchanged. Built-in channels can't be changed |
+| `DELETE` | `/api/channels/:id` | | Needs token if protected. Built-in channels can't be deleted |
 
-Middleware applied globally:
-- `cors()` — allows cross-origin requests
-- `express.json({ limit: '10mb' })` — parses JSON bodies up to 10 MB
-- `express.urlencoded({ extended: true })` — parses form-encoded bodies
-- `express.static('public')` — serves the dashboard at `/`
+Channel config:
 
-### In-memory Store
-
-```js
-let logs = [];
-```
-
-All captured logs live here. Wiped on process restart.
-
-### WebSocket Broadcast (lines 23–30)
-
-```js
-function broadcast(data) {
-  const msg = JSON.stringify(data);
-  wss.clients.forEach(client => {
-    if (client.readyState === WebSocket.OPEN) client.send(msg);
-  });
+```json
+{
+  "id": "my-service",
+  "name": "My service",
+  "viewPassword": "at least 4 chars",
+  "authKey": "secret",
+  "response": { "status": 200, "headers": { "x-foo": "bar" }, "body": "{\"ok\":true}", "delayMs": 0 },
+  "signature": { "type": "stripe", "header": "", "secret": "whsec_..." }
 }
 ```
 
-Iterates every connected WebSocket client and sends a JSON message. Skips clients that are not yet fully open.
+`viewPassword: ""` removes the password. `authKey: ""` turns auth off. `signature.secret` omitted keeps the current secret.
 
-### Logging Middleware (lines 38–71)
+### Logs
 
-Applied only to paths starting with `/webhook`. Wraps `res.send` to capture the response body, then listens for the `finish` event to build and store the log entry.
+| Method | Path | Body | Notes |
+|---|---|---|---|
+| `GET` | `/logs/:channel` | | Newest first |
+| `DELETE` | `/logs/:channel` | | Clears unstarred logs |
+| `DELETE` | `/logs/:channel/:id` | | Deletes one log |
+| `PATCH` | `/logs/:channel/:id` | `{ "pinned": true }` | Star / unstar |
+| `POST` | `/logs/:channel/import` | `{ "logs": [...] }` | Max 500 per call; entries are sanitized and marked `imported` |
 
-Only `GET` and `POST` methods are logged (other methods are passed through but not stored).
-
-**Log object shape:**
+### Log object
 
 ```js
 {
-  id:       Date.now(),          // number — used as unique identifier
-  method:   req.method,          // 'GET' | 'POST'
-  url:      req.originalUrl,     // full path including query string
-  headers:  req.headers,         // all request headers
-  query:    req.query,           // parsed query params
-  body:     req.body,            // parsed request body
-  response: responseBody,        // raw response body string
-  status:   res.statusCode,      // HTTP status code
-  time:     new Date().toISOString(),
-  duration: Date.now() - start   // milliseconds
+  id, channel, method, url, ip,
+  headers,          // sensitive ones masked
+  query,
+  contentType,
+  body,             // parsed JSON / form object, text, or null
+  rawBody,          // exactly as received (base64 if binary)
+  rawEncoding,      // 'utf8' | 'base64'
+  size,             // bytes
+  response, responseHeaders, status,
+  time, duration, aborted,
+  signature,        // null or { type, header, valid, reason }
+  pinned
 }
 ```
-
-### Authentication Middleware (lines 74–80)
-
-```js
-function authMiddleware(req, res, next) {
-  const token = req.headers['auth-key'];
-  if (!token || token !== API_TOKEN) {
-    return res.status(401).json({ message: 'Unauthorized' });
-  }
-  next();
-}
-```
-
-Reads the `auth-key` request header and compares it to `process.env.AUTH_KEY`. Returns 401 on mismatch.
-
----
-
-## API Reference
-
-### `ALL /webhook`
-
-The primary target endpoint. Accepts any HTTP method.
-
-| | |
-|---|---|
-| Auth | Required (`auth-key` header) |
-| Response | `200 { "status": "OK" }` |
-| Side effect | Request is captured and broadcast to dashboard |
-
-**Example request:**
-```bash
-curl -X POST http://localhost:3000/webhook \
-  -H "auth-key: test" \
-  -H "Content-Type: application/json" \
-  -d '{"event":"sms","from":"+1234567890","text":"Hello"}'
-```
-
-**Auth failure response:**
-```json
-{ "message": "Unauthorized" }
-```
-
----
-
-### `GET /logs`
-
-Returns all stored logs as a JSON array (newest first, since entries are unshifted).
-
-| | |
-|---|---|
-| Auth | None |
-| Response | `200 [ ...logs ]` |
-
----
-
-### `DELETE /logs`
-
-Clears all logs from memory and broadcasts `CLEAR_LOGS` to all dashboard clients.
-
-| | |
-|---|---|
-| Auth | None |
-| Response | `200 { "status": "cleared" }` |
-| Broadcast | `{ "type": "CLEAR_LOGS" }` |
-
----
-
-### `DELETE /logs/:id`
-
-Deletes a single log by its `id` (timestamp integer) and broadcasts `DELETE_LOG`.
-
-| | |
-|---|---|
-| Auth | None |
-| Param | `:id` — the log's `id` field |
-| Response | `200 { "status": "deleted" }` |
-| Broadcast | `{ "type": "DELETE_LOG", "id": <number> }` |
 
 ---
 
 ## WebSocket Protocol
 
-The client connects to the same host/port as the HTTP server:
+Connect to the same host/port (`ws://localhost:3000/`). To receive protected channels, send `{ "type": "AUTH", "tokens": { "<channelId>": "<token>" } }` after connecting (and again whenever tokens change). Channel-scoped messages for a protected channel only go to clients holding its token. Messages:
 
-```js
-const ws = new WebSocket(`ws://localhost:3000`);
-```
+| `type` | Payload |
+|---|---|
+| `NEW_LOG` | `channel`, `data` (log), `dropped` (ids removed by the cap) |
+| `UPDATE_LOG` | `channel`, `data` (log) |
+| `DELETE_LOG` | `channel`, `id` |
+| `CLEAR_LOGS` | `channel` (starred logs remain) |
+| `RELOAD_CHANNEL` | `channel` (refetch after an import) |
+| `CHANNEL_UPSERT` | `data` (public channel) |
+| `CHANNEL_DELETE` | `id` |
 
-The server broadcasts three message types:
+After a reconnect the dashboard refetches everything, so missed events are not lost.
 
-| `type` | Payload | Trigger |
+---
+
+## Keyboard Shortcuts
+
+| Key | Action |
+|---|---|
+| `j` / `k` | Next / previous log |
+| `o` or `Enter` | Expand / collapse |
+| `c` | Copy as cURL |
+| `s` | Star / unstar |
+| `x` | Select for compare |
+| `/` | Search |
+| `p` | Pause / resume this channel |
+| `[` / `]` | Previous / next channel |
+| `n` / `m` | Notification / sound for this channel |
+| `t` | Toggle theme |
+| `?` | Help |
+| `Esc` | Close dialog / clear selection |
+
+---
+
+## Using with Vonage
+
+1. Expose the server publicly, e.g. `ngrok http 3000` (and set `TRUST_PROXY=true` to log real IPs).
+2. Create a channel (e.g. `vonage`) and point your Vonage application's answer/event URLs at `https://<ngrok-id>.ngrok.io/hook/vonage/answer` and `.../hook/vonage/event`.
+3. For signed webhooks, set the channel's signature type to **Vonage (JWT)** and paste your account's signature secret.
+4. Use the custom response to return NCCO JSON for answer URLs, or a delay / 5xx to test Vonage retries.
+
+---
+
+## Where Data Lives
+
+| Data | Stored in | Shared? |
 |---|---|---|
-| `NEW_LOG` | `{ type, data: logObject }` | New webhook received |
-| `CLEAR_LOGS` | `{ type }` | `DELETE /logs` called |
-| `DELETE_LOG` | `{ type, id: number }` | `DELETE /logs/:id` called |
+| Channels (config, auth keys, signing secrets, password hashes) | Server memory (`channels` Map in `index.js`) | Channel list is visible to everyone |
+| Captured logs | Server memory, inside each channel | Everyone, unless the channel has a password |
+| Theme, channel access tokens, alert prefs | Browser `localStorage` | Per browser |
 
----
-
-## Frontend — `public/index.html`
-
-A single self-contained HTML file. No framework, no build tool.
-
-### Initialization Flow
-
-1. `fetch('/logs')` — loads existing logs on page open
-2. Reverse array so newest appears at top
-3. Render all logs to DOM via `refresh()`
-4. Open WebSocket connection
-5. Listen for real-time messages and update DOM accordingly
-
-### Key JavaScript Functions
-
-| Function | Purpose |
-|---|---|
-| `renderLog(log, index)` | Builds a DOM element for a single log entry |
-| `refresh()` | Clears `#logs` div and re-renders all entries |
-| `toggle(el)` | Expand/collapse a log's detail panel |
-| `toggleSection(el)` | Expand/collapse an individual section (Headers, Query, Body, Response) |
-| `section(title, data)` | Returns HTML string for a collapsible data section |
-| `safeParse(data)` | Tries `JSON.parse`, falls back to raw value |
-| `indicator(obj)` | Returns ⚪ (empty) or 🟢 (has data) |
-| `deleteLog(e, id)` | Calls `DELETE /logs/:id` |
-| `clearLogs()` | Calls `DELETE /logs` |
-
-### Visual Styling
-
-- **GET requests** — green left border + green glow
-- **POST requests** — blue left border + blue glow
-- **4xx/5xx responses** — red box shadow
-- **Status badge** — green for success, red for error
-- Dark background (`#020617`), glassmorphism header, Inter font
-
----
-
-## Vonage Integration Context
-
-Vonage (formerly Nexmo) sends webhook callbacks to a configured URL when telephony events occur. This server acts as the receiver.
-
-**Typical Vonage webhook events this tool would capture:**
-
-| Category | Events |
-|---|---|
-| SMS | Inbound message, delivery receipt, failed delivery |
-| Voice | Call answered, call hangup, DTMF input, recording ready |
-| Application | Number registered/unregistered, balance alerts |
-
-**How to point Vonage at this server:**
-
-1. Expose the local server publicly (e.g. via `ngrok http 3000`)
-2. Set your Vonage application webhook URL to: `https://<ngrok-id>.ngrok.io/webhook`
-3. Configure Vonage to send `auth-key: test` in request headers (or update `AUTH_KEY` in `.env`)
+Restarting the server wipes channels and logs. Secrets never leave the server: the dashboard only sees `hasAuthKey` / `hasSecret`.
 
 ---
 
@@ -334,20 +271,13 @@ Vonage (formerly Nexmo) sends webhook callbacks to a configured URL when telepho
 
 | Limitation | Detail |
 |---|---|
-| No persistence | Logs live in memory; wiped on restart |
-| Single process | No support for multiple server instances sharing logs |
-| No HTTPS | Dashboard and WebSocket run plain HTTP/WS unless wrapped |
-| No rate limiting | No throttle on the `/webhook` endpoint |
+| No persistence | Logs and custom channels live in memory; wiped on restart |
+| Single process | No support for multiple instances sharing logs |
+| No HTTPS | Wrap with a proxy / ngrok when exposed |
+| No rate limiting | No throttle on `/hook/*` |
 
 ---
 
-## Dependency Versions (from `package.json`)
+## Credits
 
-```json
-{
-  "cors":   "^2.8.6",
-  "dotenv": "^17.3.1",
-  "express": "^5.2.1",
-  "ws":     "^8.20.0"
-}
-```
+© 2026 Webhook Inspector · Built by **Rishabh @ Runo**
